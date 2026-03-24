@@ -12,14 +12,10 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 )
 
-func (s *Service) HandleSuggestQuery(rw http.ResponseWriter, req *http.Request) {
-	logger := logger.FromContext(req.Context())
+func (ds *DataSource) HandleSuggestQuery(rw http.ResponseWriter, req *http.Request) {
+	logger := backend.Logger.FromContext(req.Context())
 
-	dsInfo, err := s.getDSInfo(req.Context(), backend.PluginConfigFromContext(req.Context()))
-	if err != nil {
-		http.Error(rw, fmt.Sprintf("failed to get datasource info: %v", err), http.StatusInternalServerError)
-		return
-	}
+	dsInfo := ds.info
 
 	u, err := url.Parse(dsInfo.URL)
 	if err != nil {
@@ -43,7 +39,7 @@ func (s *Service) HandleSuggestQuery(rw http.ResponseWriter, req *http.Request) 
 
 	defer func() {
 		if err := res.Body.Close(); err != nil {
-			logger.Error("Failed to close response body", "error", err)
+			logger.Warn("Failed to close response body", "error", err)
 		}
 	}()
 
@@ -64,19 +60,15 @@ func (s *Service) HandleSuggestQuery(rw http.ResponseWriter, req *http.Request) 
 
 	rw.WriteHeader(res.StatusCode)
 	if _, err := rw.Write(responseBody); err != nil {
-		logger.Error("Failed to write response", "error", err)
+		logger.Warn("Failed to write response", "error", err)
 		return
 	}
 }
 
-func (s *Service) HandleAggregatorsQuery(rw http.ResponseWriter, req *http.Request) {
-	logger := logger.FromContext(req.Context())
+func (ds *DataSource) HandleAggregatorsQuery(rw http.ResponseWriter, req *http.Request) {
+	logger := backend.Logger.FromContext(req.Context())
 
-	dsInfo, err := s.getDSInfo(req.Context(), backend.PluginConfigFromContext(req.Context()))
-	if err != nil {
-		http.Error(rw, fmt.Sprintf("failed to get datasource info: %v", err), http.StatusInternalServerError)
-		return
-	}
+	dsInfo := ds.info
 
 	u, err := url.Parse(dsInfo.URL)
 	if err != nil {
@@ -99,7 +91,7 @@ func (s *Service) HandleAggregatorsQuery(rw http.ResponseWriter, req *http.Reque
 
 	defer func() {
 		if err := res.Body.Close(); err != nil {
-			logger.Error("Failed to close response body", "error", err)
+			logger.Warn("Failed to close response body", "error", err)
 		}
 	}()
 
@@ -133,19 +125,15 @@ func (s *Service) HandleAggregatorsQuery(rw http.ResponseWriter, req *http.Reque
 
 	rw.WriteHeader(res.StatusCode)
 	if _, err := rw.Write(sortedResponse); err != nil {
-		logger.Error("Failed to write response", "error", err)
+		logger.Warn("Failed to write response", "error", err)
 		return
 	}
 }
 
-func (s *Service) HandleFiltersQuery(rw http.ResponseWriter, req *http.Request) {
-	logger := logger.FromContext(req.Context())
+func (ds *DataSource) HandleFiltersQuery(rw http.ResponseWriter, req *http.Request) {
+	logger := backend.Logger.FromContext(req.Context())
 
-	dsInfo, err := s.getDSInfo(req.Context(), backend.PluginConfigFromContext(req.Context()))
-	if err != nil {
-		http.Error(rw, fmt.Sprintf("failed to get datasource info: %v", err), http.StatusInternalServerError)
-		return
-	}
+	dsInfo := ds.info
 
 	u, err := url.Parse(dsInfo.URL)
 	if err != nil {
@@ -168,7 +156,7 @@ func (s *Service) HandleFiltersQuery(rw http.ResponseWriter, req *http.Request) 
 
 	defer func() {
 		if err := res.Body.Close(); err != nil {
-			logger.Error("Failed to close response body", "error", err)
+			logger.Warn("Failed to close response body", "error", err)
 		}
 	}()
 
@@ -207,12 +195,12 @@ func (s *Service) HandleFiltersQuery(rw http.ResponseWriter, req *http.Request) 
 
 	rw.WriteHeader(res.StatusCode)
 	if _, err := rw.Write(sortedResponse); err != nil {
-		logger.Error("Failed to write response", "error", err)
+		logger.Warn("Failed to write response", "error", err)
 		return
 	}
 }
 
-func (s *Service) HandleLookupQuery(rw http.ResponseWriter, req *http.Request) {
+func (ds *DataSource) HandleLookupQuery(rw http.ResponseWriter, req *http.Request) {
 	queryParams := req.URL.Query()
 	typeParam := queryParams.Get("type")
 	if typeParam == "" {
@@ -222,23 +210,19 @@ func (s *Service) HandleLookupQuery(rw http.ResponseWriter, req *http.Request) {
 
 	switch typeParam {
 	case "key":
-		s.HandleKeyLookup(rw, req, queryParams)
+		ds.HandleKeyLookup(rw, req, queryParams)
 	case "keyvalue":
-		s.HandleKeyValueLookup(rw, req, queryParams)
+		ds.HandleKeyValueLookup(rw, req, queryParams)
 	default:
 		http.Error(rw, fmt.Sprintf("unsupported type: %s", typeParam), http.StatusBadRequest)
 		return
 	}
 }
 
-func (s *Service) HandleKeyLookup(rw http.ResponseWriter, req *http.Request, queryParams url.Values) {
-	logger := logger.FromContext(req.Context())
+func (ds *DataSource) HandleKeyLookup(rw http.ResponseWriter, req *http.Request, queryParams url.Values) {
+	logger := backend.Logger.FromContext(req.Context())
 
-	dsInfo, err := s.getDSInfo(req.Context(), backend.PluginConfigFromContext(req.Context()))
-	if err != nil {
-		http.Error(rw, fmt.Sprintf("failed to get datasource info: %v", err), http.StatusInternalServerError)
-		return
-	}
+	dsInfo := ds.info
 
 	metric := queryParams.Get("metric")
 	if metric == "" {
@@ -272,7 +256,7 @@ func (s *Service) HandleKeyLookup(rw http.ResponseWriter, req *http.Request, que
 
 	defer func() {
 		if err := res.Body.Close(); err != nil {
-			logger.Error("Failed to close response body", "error", err)
+			logger.Warn("Failed to close response body", "error", err)
 		}
 	}()
 
@@ -324,19 +308,15 @@ func (s *Service) HandleKeyLookup(rw http.ResponseWriter, req *http.Request, que
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(res.StatusCode)
 	if _, err := rw.Write(sortedResponse); err != nil {
-		logger.Error("Failed to write response", "error", err)
+		logger.Warn("Failed to write response", "error", err)
 		return
 	}
 }
 
-func (s *Service) HandleKeyValueLookup(rw http.ResponseWriter, req *http.Request, queryParams url.Values) {
-	logger := logger.FromContext(req.Context())
+func (ds *DataSource) HandleKeyValueLookup(rw http.ResponseWriter, req *http.Request, queryParams url.Values) {
+	logger := backend.Logger.FromContext(req.Context())
 
-	dsInfo, err := s.getDSInfo(req.Context(), backend.PluginConfigFromContext(req.Context()))
-	if err != nil {
-		http.Error(rw, fmt.Sprintf("failed to get datasource info: %v", err), http.StatusInternalServerError)
-		return
-	}
+	dsInfo := ds.info
 
 	metric := queryParams.Get("metric")
 	if metric == "" {
@@ -395,7 +375,7 @@ func (s *Service) HandleKeyValueLookup(rw http.ResponseWriter, req *http.Request
 
 	defer func() {
 		if err := res.Body.Close(); err != nil {
-			logger.Error("Failed to close response body", "error", err)
+			logger.Warn("Failed to close response body", "error", err)
 		}
 	}()
 
@@ -447,7 +427,7 @@ func (s *Service) HandleKeyValueLookup(rw http.ResponseWriter, req *http.Request
 	rw.Header().Set("Content-Type", "application/json")
 	rw.WriteHeader(res.StatusCode)
 	if _, err := rw.Write(sortedResponse); err != nil {
-		logger.Error("Failed to write response", "error", err)
+		logger.Warn("Failed to write response", "error", err)
 		return
 	}
 }

@@ -11,8 +11,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
-	"github.com/grafana/grafana-plugin-sdk-go/backend/datasource"
-	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,10 +54,9 @@ func TestCheckHealth(t *testing.T) {
 				},
 			}
 
-			im := datasource.NewInstanceManager(newInstanceSettings(httpclient.NewProvider()))
-			service := &Service{im: im}
+			ds := &DataSource{info: &datasourceInfo{HTTPClient: http.DefaultClient, URL: server.URL}}
 			ctx := backend.WithPluginContext(context.Background(), pluginCtx)
-			result, err := service.CheckHealth(ctx, &backend.CheckHealthRequest{
+			result, err := ds.CheckHealth(ctx, &backend.CheckHealthRequest{
 				PluginContext: pluginCtx,
 			})
 
@@ -235,6 +232,7 @@ func TestBuildMetric(t *testing.T) {
 }
 
 func TestOpenTsdbExecutor(t *testing.T) {
+	logger := backend.Logger.FromContext(context.Background())
 	t.Run("create request", func(t *testing.T) {
 		req, err := CreateRequest(context.Background(), logger, &datasourceInfo{}, OpenTsdbQuery{})
 		require.NoError(t, err)
@@ -697,23 +695,12 @@ func TestOpenTsdbExecutor(t *testing.T) {
 		}))
 		t.Cleanup(srv.Close)
 
-		service := &Service{
-			im: datasource.NewInstanceManager(newInstanceSettings(httpclient.NewProvider())),
-		}
-
-		settings := &backend.DataSourceInstanceSettings{
-			UID:      "opentsdb-test",
-			URL:      srv.URL,
-			JSONData: []byte(`{"tsdbVersion":4,"httpMethod":"post"}`),
-		}
+		ds := &DataSource{info: &datasourceInfo{HTTPClient: http.DefaultClient, URL: srv.URL, TSDBVersion: 4}}
 
 		req := backend.QueryDataRequest{
-			PluginContext: backend.PluginContext{
-				DataSourceInstanceSettings: settings,
-			},
 			Queries: []backend.DataQuery{qA, qB},
 		}
-		_, err := service.QueryData(context.Background(), &req)
+		_, err := ds.QueryData(context.Background(), &req)
 		require.NoError(t, err)
 
 		require.Equal(t, 2, hits)

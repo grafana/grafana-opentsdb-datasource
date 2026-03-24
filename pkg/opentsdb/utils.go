@@ -259,7 +259,7 @@ func ParseResponse(logger log.Logger, res *http.Response, refID string, tsdbVers
 			return nil, err
 		}
 
-		frames, err = ParseResponseLT24(responseData, refID, frames)
+		frames, err = ParseResponseLT24(logger, responseData, refID, frames)
 		if err != nil {
 			return nil, err
 		}
@@ -285,7 +285,7 @@ func ParseResponse24(responseData []OpenTsdbResponse24, refID string, frames dat
 	return frames
 }
 
-func ParseResponseLT24(responseData []OpenTsdbResponse, refID string, frames data.Frames) (data.Frames, error) {
+func ParseResponseLT24(logger log.Logger, responseData []OpenTsdbResponse, refID string, frames data.Frames) (data.Frames, error) {
 	for _, val := range responseData {
 		frame := CreateDataFrame(val.OpenTsdbCommon, len(val.DataPoints), refID)
 

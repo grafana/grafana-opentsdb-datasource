@@ -11,22 +11,45 @@ import (
 	"strings"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
-	"github.com/grafana/grafana-plugin-sdk-go/backend/datasource"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/resource/httpadapter"
 )
 
-var logger = backend.NewLoggerWith("tsdb.opentsdb")
+// Ensure DataSource implements backend interfaces (compile-time checks)
+var _ backend.CheckHealthHandler = (*DataSource)(nil)
+var _ backend.CallResourceHandler = (*DataSource)(nil)
+var _ backend.QueryDataHandler = (*DataSource)(nil)
 
-type Service struct {
-	im instancemgmt.InstanceManager
+type DataSource struct {
+	info *datasourceInfo
 }
 
-func ProvideService(httpClientProvider *httpclient.Provider) *Service {
-	return &Service{
-		im: datasource.NewInstanceManager(newInstanceSettings(httpClientProvider)),
+func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
+	opts, err := settings.HTTPClientOptions(ctx)
+	if err != nil {
+		return nil, err
 	}
+
+	client, err := httpclient.New(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	jsonData := JSONData{}
+	if err := json.Unmarshal(settings.JSONData, &jsonData); err != nil {
+		return nil, backend.DownstreamErrorf("error reading settings: %w", err)
+	}
+
+	return &DataSource{
+		info: &datasourceInfo{
+			HTTPClient:     client,
+			URL:            settings.URL,
+			TSDBVersion:    jsonData.TSDBVersion,
+			TSDBResolution: jsonData.TSDBResolution,
+			LookupLimit:    jsonData.LookupLimit,
+		},
+	}, nil
 }
 
 type datasourceInfo struct {
@@ -61,46 +84,10 @@ type QueryModel struct {
 	ExplicitTags         bool                   `json:"explicitTags"`
 }
 
-func newInstanceSettings(httpClientProvider *httpclient.Provider) datasource.InstanceFactoryFunc {
-	return func(ctx context.Context, settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
-		opts, err := settings.HTTPClientOptions(ctx)
-		if err != nil {
-			return nil, err
-		}
+func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult, error) {
+	logger := backend.Logger.FromContext(ctx)
 
-		client, err := httpClientProvider.New(opts)
-		if err != nil {
-			return nil, err
-		}
-
-		jsonData := JSONData{}
-		err = json.Unmarshal(settings.JSONData, &jsonData)
-		if err != nil {
-			return nil, fmt.Errorf("error reading settings: %w", err)
-		}
-
-		model := &datasourceInfo{
-			HTTPClient:     client,
-			URL:            settings.URL,
-			TSDBVersion:    jsonData.TSDBVersion,
-			TSDBResolution: jsonData.TSDBResolution,
-			LookupLimit:    jsonData.LookupLimit,
-		}
-
-		return model, nil
-	}
-}
-
-func (s *Service) CheckHealth(ctx context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult, error) {
-	logger := logger.FromContext(ctx)
-
-	dsInfo, err := s.getDSInfo(ctx, req.PluginContext)
-	if err != nil {
-		return &backend.CheckHealthResult{
-			Status:  backend.HealthStatusError,
-			Message: err.Error(),
-		}, nil
-	}
+	dsInfo := ds.info
 
 	u, err := url.Parse(dsInfo.URL)
 	if err != nil {
@@ -134,7 +121,7 @@ func (s *Service) CheckHealth(ctx context.Context, req *backend.CheckHealthReque
 
 	defer func() {
 		if err := res.Body.Close(); err != nil {
-			logger.Error("Failed to close response body", "error", err)
+			logger.Warn("Failed to close response body", "error", err)
 		}
 	}()
 
@@ -151,28 +138,22 @@ func (s *Service) CheckHealth(ctx context.Context, req *backend.CheckHealthReque
 	}, nil
 }
 
-func (s *Service) CallResource(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
+func (ds *DataSource) CallResource(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/suggest", s.HandleSuggestQuery)
-	mux.HandleFunc("/api/aggregators", s.HandleAggregatorsQuery)
-	mux.HandleFunc("/api/config/filters", s.HandleFiltersQuery)
-	mux.HandleFunc("/api/search/lookup", s.HandleLookupQuery)
+	mux.HandleFunc("/api/suggest", ds.HandleSuggestQuery)
+	mux.HandleFunc("/api/aggregators", ds.HandleAggregatorsQuery)
+	mux.HandleFunc("/api/config/filters", ds.HandleFiltersQuery)
+	mux.HandleFunc("/api/search/lookup", ds.HandleLookupQuery)
 
 	handler := httpadapter.New(mux)
 	return handler.CallResource(ctx, req, sender)
 }
 
-func (s *Service) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
-	logger := logger.FromContext(ctx)
+func (ds *DataSource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
+	logger := backend.Logger.FromContext(ctx)
 	result := backend.NewQueryDataResponse()
 
-	dsInfo, err := s.getDSInfo(ctx, req.PluginContext)
-	if err != nil {
-		for _, q := range req.Queries {
-			result.Responses[q.RefID] = backend.ErrorResponseWithErrorSource(backend.PluginError(err))
-		}
-		return result, nil
-	}
+	dsInfo := ds.info
 
 	for _, query := range req.Queries {
 		metric, err := BuildMetric(query)
@@ -210,7 +191,7 @@ func (s *Service) QueryData(ctx context.Context, req *backend.QueryDataRequest) 
 
 		defer func() {
 			if cerr := httpRes.Body.Close(); cerr != nil {
-				logger.Warn("failed to close response body", "error", cerr)
+				logger.Warn("Failed to close response body", "error", cerr)
 			}
 		}()
 
@@ -224,18 +205,4 @@ func (s *Service) QueryData(ctx context.Context, req *backend.QueryDataRequest) 
 	}
 
 	return result, nil
-}
-
-func (s *Service) getDSInfo(ctx context.Context, pluginCtx backend.PluginContext) (*datasourceInfo, error) {
-	i, err := s.im.Get(ctx, pluginCtx)
-	if err != nil {
-		return nil, err
-	}
-
-	instance, ok := i.(*datasourceInfo)
-	if !ok {
-		return nil, fmt.Errorf("failed to cast datasource info")
-	}
-
-	return instance, nil
 }
