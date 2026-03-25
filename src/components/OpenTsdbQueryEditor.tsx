@@ -1,5 +1,5 @@
 import { css } from '@emotion/css';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import { GrafanaTheme2, QueryEditorProps, textUtil } from '@grafana/data';
 import { useStyles2, Stack } from '@grafana/ui';
@@ -15,52 +15,38 @@ import { TagSection } from './TagSection';
 
 export type OpenTsdbQueryEditorProps = QueryEditorProps<OpenTsDatasource, OpenTsdbQuery, OpenTsdbOptions>;
 
-export function OpenTsdbQueryEditor({
-  datasource,
-  onRunQuery,
-  onChange,
-  query,
-  range,
-  queries,
-}: OpenTsdbQueryEditorProps) {
+const fillPolicies: string[] = ['none', 'nan', 'null', 'zero'];
+const aggregatorsDefault: string[] = ['avg', 'sum', 'min', 'max', 'dev', 'zimsum', 'mimmin', 'mimmax'];
+const filterTypesDefault: string[] = ['wildcard', 'iliteral_or', 'not_iliteral_or', 'not_literal_or', 'iwildcard', 'literal_or', 'regexp'];
+export function OpenTsdbQueryEditor({ datasource, onRunQuery, onChange, query }: OpenTsdbQueryEditorProps) {
   const styles = useStyles2(getStyles);
 
-  const [aggregators, setAggregators] = useState<string[]>([
-    'avg',
-    'sum',
-    'min',
-    'max',
-    'dev',
-    'zimsum',
-    'mimmin',
-    'mimmax',
-  ]);
-
-  const fillPolicies: string[] = ['none', 'nan', 'null', 'zero'];
-
-  const [filterTypes, setFilterTypes] = useState<string[]>([
-    'wildcard',
-    'iliteral_or',
-    'not_iliteral_or',
-    'not_literal_or',
-    'iwildcard',
-    'literal_or',
-    'regexp',
-  ]);
+  const [aggregators, setAggregators] = useState<string[]>(aggregatorsDefault);
+  const [filterTypes, setFilterTypes] = useState<string[]>(filterTypesDefault);
 
   const tsdbVersion: number = datasource.tsdbVersion;
 
-  if (!query.aggregator) {
-    query.aggregator = 'sum';
-  }
+  const effectiveQuery = useMemo<OpenTsdbQuery>(
+    () => ({
+      ...query,
+      aggregator: query.aggregator || 'sum',
+      downsampleAggregator: query.downsampleAggregator || 'avg',
+      downsampleFillPolicy: query.downsampleFillPolicy || 'none',
+    }),
+    [query]
+  );
 
-  if (!query.downsampleAggregator) {
-    query.downsampleAggregator = 'avg';
-  }
+  useEffect(() => {
+    if (
+      query.aggregator === effectiveQuery.aggregator &&
+      query.downsampleAggregator === effectiveQuery.downsampleAggregator &&
+      query.downsampleFillPolicy === effectiveQuery.downsampleFillPolicy
+    ) {
+      return;
+    }
 
-  if (!query.downsampleFillPolicy) {
-    query.downsampleFillPolicy = 'none';
-  }
+    onChange(effectiveQuery);
+  }, [effectiveQuery, onChange, query.aggregator, query.downsampleAggregator, query.downsampleFillPolicy]);
 
   useEffect(() => {
     datasource.getAggregators().then((aggs: string[]) => {
@@ -114,14 +100,14 @@ export function OpenTsdbQueryEditor({
     <div className={styles.container} data-testid={testIds.editor}>
       <Stack gap={0.5} direction="column" grow={1}>
         <MetricSection
-          query={query}
+          query={effectiveQuery}
           onChange={onChange}
           onRunQuery={onRunQuery}
           suggestMetrics={suggestMetrics}
           aggregators={aggregators}
         />
         <DownSample
-          query={query}
+          query={effectiveQuery}
           onChange={onChange}
           onRunQuery={onRunQuery}
           aggregators={aggregators}
@@ -130,7 +116,7 @@ export function OpenTsdbQueryEditor({
         />
         {tsdbVersion >= 2 && (
           <FilterSection
-            query={query}
+            query={effectiveQuery}
             onChange={onChange}
             onRunQuery={onRunQuery}
             filterTypes={filterTypes}
@@ -139,14 +125,14 @@ export function OpenTsdbQueryEditor({
           />
         )}
         <TagSection
-          query={query}
+          query={effectiveQuery}
           onChange={onChange}
           onRunQuery={onRunQuery}
           suggestTagValues={suggestTagValues}
           suggestTagKeys={suggestTagKeys}
           tsdbVersion={tsdbVersion}
         />
-        <RateSection query={query} onChange={onChange} onRunQuery={onRunQuery} tsdbVersion={tsdbVersion} />
+        <RateSection query={effectiveQuery} onChange={onChange} onRunQuery={onRunQuery} tsdbVersion={tsdbVersion} />
       </Stack>
     </div>
   );

@@ -1,6 +1,6 @@
 import debounce from 'debounce-promise';
 import { size } from 'lodash';
-import { useCallback, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 
 import { SelectableValue, toOption } from '@grafana/data';
 import {
@@ -74,8 +74,8 @@ export function FilterSection({
       groupBy: curFilterGroupBy,
     };
 
-    // filters may be undefined
-    query.filters = query.filters ? query.filters.concat([currentFilter]) : [currentFilter];
+    const nextFilters = [...(query.filters ?? []), currentFilter];
+    const nextQuery = { ...query, filters: nextFilters };
 
     // reset the inputs
     updCurFilterType('literal_or');
@@ -84,7 +84,7 @@ export function FilterSection({
     updCurFilterGroupBy(false);
 
     // fire the query
-    onChange(query);
+    onChange(nextQuery);
     onRunQuery();
 
     // close the filter ditor
@@ -92,9 +92,13 @@ export function FilterSection({
   }
 
   function removeFilter(index: number) {
-    query.filters?.splice(index, 1);
+    if (!query.filters) {
+      return;
+    }
+    const nextFilters = query.filters.filter((_, i) => i !== index);
+    const nextQuery = { ...query, filters: nextFilters };
     // fire the query
-    onChange(query);
+    onChange(nextQuery);
     onRunQuery();
   }
 

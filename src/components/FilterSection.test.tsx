@@ -1,3 +1,4 @@
+import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { OpenTsdbQuery } from '../types';
@@ -100,7 +101,9 @@ describe('FilterSection', () => {
 
       setup({ query });
       fireEvent.click(screen.getByTestId(testIds.remove));
-      expect(query.filters?.length === 0).toBeTruthy();
+      expect(onChange).toHaveBeenCalled();
+      const updated = onChange.mock.calls[onChange.mock.calls.length - 1][0] as OpenTsdbQuery;
+      expect(updated.filters ?? []).toHaveLength(0);
     });
   });
 });

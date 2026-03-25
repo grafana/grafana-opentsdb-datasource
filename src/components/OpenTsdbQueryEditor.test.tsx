@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import React from 'react';
+import { render, screen, waitFor } from '@testing-library/react';
 
 import OpenTsDatasource from '../datasource';
 import { OpenTsdbQuery } from '../types';
@@ -28,11 +29,26 @@ const setup = (propOverrides?: Object) => {
 
   Object.assign(props, propOverrides);
 
-  return render(<OpenTsdbQueryEditor {...props} />);
+  return { ...render(<OpenTsdbQueryEditor {...props} />), onChange, onRunQuery };
 };
 describe('OpenTsdbQueryEditor', () => {
   it('should render editor', () => {
     setup();
     expect(screen.getByTestId(testIds.editor)).toBeInTheDocument();
+  });
+
+  it('applies default aggregator and downsampling fields via onChange when missing', async () => {
+    const { onChange } = setup();
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          refId: 'A',
+          metric: '',
+          aggregator: 'sum',
+          downsampleAggregator: 'avg',
+          downsampleFillPolicy: 'none',
+        })
+      );
+    });
   });
 });

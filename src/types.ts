@@ -1,4 +1,5 @@
-import { DataQuery, DataSourceJsonData } from '@grafana/data';
+import { DataSourceJsonData } from '@grafana/data';
+import { DataQuery } from '@grafana/schema';
 
 export interface OpenTsdbQuery extends DataQuery {
   // migrating to react
@@ -16,7 +17,6 @@ export interface OpenTsdbQuery extends DataQuery {
   //filters
   filters?: OpenTsdbFilter[];
 
-  // eslint-disable-next-line  @typescript-eslint/no-explicit-any
   tags?: any;
 
   // annotation attrs

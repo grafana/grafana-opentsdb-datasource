@@ -1,6 +1,6 @@
 import debounce from 'debounce-promise';
 import { has, size } from 'lodash';
-import { useState } from 'react';
+import React, { useState } from 'react';
 
 import { SelectableValue, toOption } from '@grafana/data';
 import {
@@ -68,20 +68,18 @@ export function TagSection({
       return;
     }
 
-    // tags may be undefined
-    if (!query.tags) {
-      query.tags = {};
-    }
-
-    // add tag to query
-    query.tags[curTagKey] = curTagValue;
+    const nextTags = {
+      ...(query.tags ?? {}),
+      [curTagKey]: curTagValue,
+    };
+    const nextQuery = { ...query, tags: nextTags };
 
     // reset the inputs
     updCurTagKey('');
     updCurTagValue('');
 
     // fire the query
-    onChange(query);
+    onChange(nextQuery);
     onRunQuery();
 
     // close the tag ditor
@@ -89,10 +87,15 @@ export function TagSection({
   }
 
   function removeTag(key: string | number) {
-    delete query.tags[key];
+    if (!query.tags) {
+      return;
+    }
+    const nextTags = { ...query.tags };
+    delete nextTags[key];
+    const nextQuery = { ...query, tags: nextTags };
 
     // fire off the query
-    onChange(query);
+    onChange(nextQuery);
     onRunQuery();
   }
 

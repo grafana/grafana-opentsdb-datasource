@@ -1,3 +1,4 @@
+import React from 'react';
 import { toOption } from '@grafana/data';
 import { InlineLabel, Select, Input, InlineFormLabel, InlineSwitch, Stack } from '@grafana/ui';
 
