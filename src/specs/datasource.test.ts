@@ -1,7 +1,7 @@
-import { of } from 'rxjs';
+import { lastValueFrom, of } from 'rxjs';
 
 import { DataQueryRequest, dateTime } from '@grafana/data';
-import { BackendSrv, FetchResponse, TemplateSrv } from '@grafana/runtime';
+import { DataSourceWithBackend, FetchResponse, TemplateSrv } from '@grafana/runtime';
 
 import OpenTsDatasource from '../datasource';
 import { OpenTsdbQuery } from '../types';
@@ -22,12 +22,42 @@ export function createFetchResponse<T>(data: T): FetchResponse<T> {
 
 const mockBackendSrv = {
   fetch: jest.fn(),
-} as unknown as BackendSrv;
+};
 
+// DataSourceWithBackend.getResource() calls getBackendSrv from an internal path Jest cannot mock
+// (blocked by package "exports"). Mirror the real URL/params behavior here so fetch assertions work.
 jest.mock('@grafana/runtime', () => ({
   ...jest.requireActual('@grafana/runtime'),
   getBackendSrv: () => mockBackendSrv,
 }));
+
+beforeAll(() => {
+  jest.spyOn(DataSourceWithBackend.prototype as any, 'getResource').mockImplementation(async function (
+    this: { uid?: string },
+    ...args: unknown[]
+  ) {
+    const path = args[0] as string;
+    const params = (args[1] as Record<string, unknown> | undefined) ?? {};
+    const res = await lastValueFrom(
+      mockBackendSrv.fetch({
+        method: 'GET',
+        url: `/api/datasources/uid/${this.uid ?? ''}/resources/${path}`,
+        params,
+      } as any)
+    );
+    return (res as FetchResponse<unknown>).data;
+  });
+});
+
+afterAll(() => {
+  jest.restoreAllMocks();
+});
+
+const TEST_DS_UID = 'test-ds-uid';
+
+function resourcesPath(resourcePath: string): string {
+  return `/api/datasources/uid/${TEST_DS_UID}/resources/${resourcePath}`;
+}
 
 const metricFindQueryData = [
   {
@@ -45,7 +75,7 @@ describe('opentsdb', () => {
     const fetchMock = jest.spyOn(mockBackendSrv, 'fetch');
     fetchMock.mockImplementation(() => of(createFetchResponse(data)));
 
-    const instanceSettings = { url: '', jsonData: { tsdbVersion: 1 } };
+    const instanceSettings = { url: '', uid: TEST_DS_UID, jsonData: { tsdbVersion: 1 } };
     const replace = jest.fn((value) => value);
     const templateSrv = {
       replace,
@@ -63,7 +93,7 @@ describe('opentsdb', () => {
       const results = await ds.metricFindQuery('metrics(pew)');
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(fetchMock.mock.calls[0][0].url).toBe('/api/suggest');
+      expect(fetchMock.mock.calls[0][0].url).toBe(resourcesPath('api/suggest'));
       expect(fetchMock.mock.calls[0][0].params?.type).toBe('metrics');
       expect(fetchMock.mock.calls[0][0].params?.q).toBe('pew');
       expect(results).not.toBe(null);
@@ -75,8 +105,9 @@ describe('opentsdb', () => {
       const results = await ds.metricFindQuery('tag_names(cpu)');
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(fetchMock.mock.calls[0][0].url).toBe('/api/search/lookup');
-      expect(fetchMock.mock.calls[0][0].params?.m).toBe('cpu');
+      expect(fetchMock.mock.calls[0][0].url).toBe(resourcesPath('api/search/lookup'));
+      expect(fetchMock.mock.calls[0][0].params?.type).toBe('key');
+      expect(fetchMock.mock.calls[0][0].params?.metric).toBe('cpu');
       expect(results).not.toBe(null);
     });
 
@@ -86,8 +117,10 @@ describe('opentsdb', () => {
       const results = await ds.metricFindQuery('tag_values(cpu, hostname)');
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(fetchMock.mock.calls[0][0].url).toBe('/api/search/lookup');
-      expect(fetchMock.mock.calls[0][0].params?.m).toBe('cpu{hostname=*}');
+      expect(fetchMock.mock.calls[0][0].url).toBe(resourcesPath('api/search/lookup'));
+      expect(fetchMock.mock.calls[0][0].params?.type).toBe('keyvalue');
+      expect(fetchMock.mock.calls[0][0].params?.metric).toBe('cpu');
+      expect(fetchMock.mock.calls[0][0].params?.keys).toBe('hostname');
       expect(results).not.toBe(null);
     });
 
@@ -97,8 +130,10 @@ describe('opentsdb', () => {
       const results = await ds.metricFindQuery('tag_values(cpu, hostname, env=$env)');
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(fetchMock.mock.calls[0][0].url).toBe('/api/search/lookup');
-      expect(fetchMock.mock.calls[0][0].params?.m).toBe('cpu{hostname=*,env=$env}');
+      expect(fetchMock.mock.calls[0][0].url).toBe(resourcesPath('api/search/lookup'));
+      expect(fetchMock.mock.calls[0][0].params?.type).toBe('keyvalue');
+      expect(fetchMock.mock.calls[0][0].params?.metric).toBe('cpu');
+      expect(fetchMock.mock.calls[0][0].params?.keys).toBe('hostname, env=$env');
       expect(results).not.toBe(null);
     });
 
@@ -108,8 +143,10 @@ describe('opentsdb', () => {
       const results = await ds.metricFindQuery('tag_values(cpu, hostname, env=$env, region=$region)');
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(fetchMock.mock.calls[0][0].url).toBe('/api/search/lookup');
-      expect(fetchMock.mock.calls[0][0].params?.m).toBe('cpu{hostname=*,env=$env,region=$region}');
+      expect(fetchMock.mock.calls[0][0].url).toBe(resourcesPath('api/search/lookup'));
+      expect(fetchMock.mock.calls[0][0].params?.type).toBe('keyvalue');
+      expect(fetchMock.mock.calls[0][0].params?.metric).toBe('cpu');
+      expect(fetchMock.mock.calls[0][0].params?.keys).toBe('hostname, env=$env, region=$region');
       expect(results).not.toBe(null);
     });
 
@@ -119,7 +156,7 @@ describe('opentsdb', () => {
       const results = await ds.metricFindQuery('suggest_tagk(foo)');
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(fetchMock.mock.calls[0][0].url).toBe('/api/suggest');
+      expect(fetchMock.mock.calls[0][0].url).toBe(resourcesPath('api/suggest'));
       expect(fetchMock.mock.calls[0][0].params?.type).toBe('tagk');
       expect(fetchMock.mock.calls[0][0].params?.q).toBe('foo');
       expect(results).not.toBe(null);
@@ -131,7 +168,7 @@ describe('opentsdb', () => {
       const results = await ds.metricFindQuery('suggest_tagv(bar)');
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(fetchMock.mock.calls[0][0].url).toBe('/api/suggest');
+      expect(fetchMock.mock.calls[0][0].url).toBe(resourcesPath('api/suggest'));
       expect(fetchMock.mock.calls[0][0].params?.type).toBe('tagv');
       expect(fetchMock.mock.calls[0][0].params?.q).toBe('bar');
       expect(results).not.toBe(null);

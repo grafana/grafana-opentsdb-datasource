@@ -1,9 +1,7 @@
 import type { PluginOptions } from '@grafana/plugin-e2e';
 import { defineConfig, devices } from '@playwright/test';
-import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
 
-const require = createRequire(import.meta.url);
 const pluginE2eAuth = `${dirname(require.resolve('@grafana/plugin-e2e'))}/auth`;
 
 /**
