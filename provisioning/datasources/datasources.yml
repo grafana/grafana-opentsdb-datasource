@@ -2,13 +2,13 @@ apiVersion: 1
 
 datasources:
   - name: 'opentsdb'
-    type: 'grafana-opentsdb-datasource'
-    access: proxy
+    type: 'opentsdb'
     isDefault: false
     orgId: 1
     version: 1
     editable: true
+    url: 'http://opentsdb:4242'
     jsonData:
-      path: '/resources'
-    secureJsonData:
-      apiKey: 'api-key'
+      tsdbVersion: 1
+      tsdbResolution: 1
+      lookupLimit: 1000

@@ -1,5 +1,19 @@
 services:
+  opentsdb:
+    image: petergrace/opentsdb-docker:latest
+    ports:
+      - '4242:4242'
+  fake-opentsdb-data:
+    image: grafana/fake-data-gen
+    depends_on:
+      - opentsdb
+    network_mode: 'service:opentsdb'
+    environment:
+      FD_DATASOURCE: opentsdb
+      FD_PORT: 4242
   grafana:
     extends:
       file: .config/docker-compose-base.yaml
       service: grafana
+    volumes:
+      - ./custom.ini:/etc/grafana/grafana.ini

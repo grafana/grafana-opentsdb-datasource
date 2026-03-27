@@ -18,6 +18,7 @@ export type OpenTsdbQueryEditorProps = QueryEditorProps<OpenTsDatasource, OpenTs
 const fillPolicies: string[] = ['none', 'nan', 'null', 'zero'];
 const aggregatorsDefault: string[] = ['avg', 'sum', 'min', 'max', 'dev', 'zimsum', 'mimmin', 'mimmax'];
 const filterTypesDefault: string[] = ['wildcard', 'iliteral_or', 'not_iliteral_or', 'not_literal_or', 'iwildcard', 'literal_or', 'regexp'];
+
 export function OpenTsdbQueryEditor({ datasource, onRunQuery, onChange, query }: OpenTsdbQueryEditorProps) {
   const styles = useStyles2(getStyles);
 
