@@ -6,7 +6,6 @@
   "executable": "gpx_grafana-opentsdb-datasource",
 
   "metrics": true,
-  "defaultMatchFormat": "pipe",
   "annotations": true,
   "alerting": true,
   "backend": true,
