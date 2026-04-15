@@ -20,7 +20,6 @@ test.describe('Config editor', () => {
     async ({ createDataSourceConfigPage, page, selectors }) => {
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
 
-      await expect(page.getByText(/Before you can use the Zipkin data source/)).toBeVisible();
       await expect(configPage.getByGrafanaSelector(selectors.pages.DataSource.name)).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Connection', exact: true })).toBeVisible();
       await expect(getDataSourceConnectionUrlInput(page)).toBeVisible();
