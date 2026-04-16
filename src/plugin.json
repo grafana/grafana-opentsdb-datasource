@@ -6,7 +6,6 @@
   "executable": "gpx_grafana-opentsdb-datasource",
 
   "metrics": true,
-  "defaultMatchFormat": "pipe",
   "annotations": true,
   "alerting": true,
   "backend": true,
@@ -17,6 +16,7 @@
       "name": "Grafana Labs",
       "url": "https://grafana.com"
     },
+    "keywords": ["opentsdb", "datasource", "time series"],
     "logos": {
       "small": "img/opentsdb_logo.png",
       "large": "img/opentsdb_logo.png"
@@ -25,7 +25,8 @@
       { "name": "Raise issue", "url": "https://github.com/grafana/grafana-opentsdb-datasource/issues/new" },
       { "name": "Documentation", "url": "https://grafana.com/docs/grafana/latest/datasources/opentsdb/" }
     ],
-    "version": "%VERSION%"
+    "version": "%VERSION%",
+    "updated": "%TODAY%"
   },
   "dependencies": {
     "grafanaDependency": ">=12.3.0",
