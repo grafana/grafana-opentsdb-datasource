@@ -25,8 +25,8 @@ services:
 
     environment:
       NODE_ENV: development
-      GF_LOG_FILTERS: plugin.grafana-opentsdb-datasource:debug
+      GF_LOG_FILTERS: plugin.opentsdb:debug
       GF_LOG_LEVEL: debug
       GF_DATAPROXY_LOGGING: 1
-      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: grafana-opentsdb-datasource
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: opentsdb
       GF_FEATURE_TOGGLES_splashScreen: "false"
