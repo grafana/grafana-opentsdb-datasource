@@ -3,14 +3,66 @@ services:
     image: petergrace/opentsdb-docker:latest@sha256:05d396f19800260c9bcfc918dbab97c289cf5f94cd90abed03adb357244516f0
     ports:
       - '4242:4242'
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider http://127.0.0.1:4242/api/version || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      # OpenTSDB ships with HBase + ZooKeeper inside the same container; first boot
+      # initialises HBase tables which is fast on x86_64 but very slow under qemu/ARM
+      # emulation on Apple Silicon. Allow up to 5 minutes before the healthcheck fails.
+      start_period: 300s
+
   fake-opentsdb-data:
     image: grafana/fake-data-gen@sha256:467a6d8f7701e11ecedc774e728eb3369e4a295f923159a9889f5d7b7d8cefec
     depends_on:
-      - opentsdb
+      opentsdb:
+        condition: service_healthy
     network_mode: 'service:opentsdb'
     environment:
       FD_DATASOURCE: opentsdb
       FD_PORT: 4242
+
+  # Loads a known set of metrics for the "Query editor with fixture data" tests.
+  # Keep the metric prefix and tags in sync with tests/e2e/queryEditor.spec.ts.
+  opentsdb-loader:
+    image: curlimages/curl:8.10.1
+    depends_on:
+      opentsdb:
+        condition: service_healthy
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        # OpenTSDB only retains data within its retention window, so we generate
+        # fixture points relative to "now". Each test run posts 60 points spaced
+        # 60s apart (1 hour total) for four metrics.
+        now=$$(date +%s)
+        i=0
+        while [ $$i -lt 60 ]; do
+          ts=$$((now - (59 - i) * 60))
+          # awk handles floating point math (busybox shell can't).
+          cpu=$$(awk -v s=$$i 'BEGIN{printf "%.2f", 20 + 60 * (sin(s/12)^2)}')
+          mem=$$(awk -v s=$$i 'BEGIN{printf "%.2f", 50 + 30 * (cos(s/8)^2)}')
+          req=$$(awk -v s=$$i 'BEGIN{printf "%d", 100 + int(200 * (sin(s/6)^2))}')
+          err=$$(awk -v s=$$i 'BEGIN{printf "%d", int(5 * (sin(s/3)^2))}')
+          body='[
+            {"metric":"test.metrics.cpu","timestamp":'$$ts',"value":'$$cpu',"tags":{"host":"web01","region":"eu-west-1"}},
+            {"metric":"test.metrics.memory","timestamp":'$$ts',"value":'$$mem',"tags":{"host":"web01","region":"eu-west-1"}},
+            {"metric":"test.metrics.requests","timestamp":'$$ts',"value":'$$req',"tags":{"host":"web01","region":"eu-west-1"}},
+            {"metric":"test.metrics.errors","timestamp":'$$ts',"value":'$$err',"tags":{"host":"web01","region":"eu-west-1"}}
+          ]'
+          curl --silent --show-error --fail --retry 5 --retry-all-errors \
+            -H "Content-Type: application/json" \
+            -X POST -d "$$body" \
+            "http://opentsdb:4242/api/put?details" > /dev/null
+          i=$$((i + 1))
+        done
+        # OpenTSDB writes are asynchronous; give it a moment to flush before tests query.
+        sleep 2
+    restart: no
+
   grafana:
     extends:
       file: .config/docker-compose-base.yaml
@@ -20,3 +72,8 @@ services:
       GF_FEATURE_TOGGLES_splashScreen: 'false'
     volumes:
       - ./custom.ini:/etc/grafana/grafana.ini
+    depends_on:
+      opentsdb:
+        condition: service_started
+      opentsdb-loader:
+        condition: service_completed_successfully
