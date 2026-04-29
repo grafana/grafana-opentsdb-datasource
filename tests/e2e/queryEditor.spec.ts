@@ -125,8 +125,11 @@ test.describe('Query editor', () => {
       await explorePage.mockResourceResponse('aggregators', []);
       await explorePage.mockResourceResponse('config/filters', []);
 
+      // Grafana's InlineSwitch hides the underlying <input> behind its <label>,
+      // so a normal click on the input is intercepted by the label. Use force
+      // (or setChecked) to toggle the underlying switch directly.
       const rateSwitch = page.getByTestId('opentsdb-shouldComputeRate');
-      await rateSwitch.click();
+      await rateSwitch.click({ force: true });
       await expect(page.getByTestId('opentsdb-is-counter')).toBeVisible();
     });
   });
