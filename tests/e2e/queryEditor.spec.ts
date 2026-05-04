@@ -2,8 +2,10 @@
 import { expect, test } from '@grafana/plugin-e2e';
 import { type Locator, type Page, type Response } from '@playwright/test';
 
+import { OpenTsdbOptions } from '../../src/types';
+
 const DS_NAME = process.env.DS_INSTANCE_NAME || 'opentsdb';
-const DS_UID = 'opentsdb-e2e';
+const PROVISIONED_FILE = 'datasources.yml';
 
 // OpenTSDB only retains data within its retention window, so the loader writes
 // fixture points relative to "now" (1 hour worth at 60 s spacing). Compute the
@@ -29,16 +31,16 @@ function getQueryEditorRow(page: Page, refId: string): Locator {
 // Builds an Explore URL with an OpenTSDB metric query pre-encoded in the panes
 // parameter. Uses the computed ISO timestamps so the query lands within the
 // loaded fixture window.
-function exploreUrl(metric: string, extra: Record<string, unknown> = {}): string {
+function exploreUrl(dsUid: string, metric: string, extra: Record<string, unknown> = {}): string {
   const panes = JSON.stringify({
     explore: {
-      datasource: DS_UID,
+      datasource: dsUid,
       queries: [
         {
           refId: 'A',
           metric,
           aggregator: 'sum',
-          datasource: { type: 'opentsdb', uid: DS_UID },
+          datasource: { type: 'opentsdb', uid: dsUid },
           ...extra,
         },
       ],
@@ -135,14 +137,20 @@ test.describe('Query editor', () => {
   });
 
   test.describe('query execution', () => {
-    test('executes a metric query and receives OK response', async ({ explorePage, page }) => {
+    test('executes a metric query and receives OK response', async ({
+      explorePage,
+      page,
+      readProvisionedDataSource,
+    }) => {
+      const ds = await readProvisionedDataSource<OpenTsdbOptions>({ fileName: PROVISIONED_FILE });
+
       await explorePage.mockQueryDataResponse({ results: { A: { frames: [] } } });
       await explorePage.mockResourceResponse('suggest?type=metrics&max=1000', []);
       await explorePage.mockResourceResponse('aggregators', []);
       await explorePage.mockResourceResponse('config/filters', []);
 
       const responsePromise = page.waitForResponse((resp) => resp.url().includes('/api/ds/query'));
-      await page.goto(exploreUrl('test.metrics.cpu'));
+      await page.goto(exploreUrl(ds.uid, 'cpu.usage'));
 
       const response = await responsePromise;
       expect(response.ok()).toBe(true);
@@ -153,15 +161,19 @@ test.describe('Query editor', () => {
 // These tests use real fixture data loaded by the opentsdb-loader service in
 // docker-compose.yaml. Each navigates to an Explore URL with a known metric
 // name pre-encoded in the panes parameter and asserts on the response shape.
+//
+// The metric names match what's in the cloud-hosted OpenTSDB instance so the
+// same tests pass against both the local docker-compose DB and the Cloud DB.
 test.describe('Query editor with fixture data', () => {
   // Serialize fixture-data tests so they don't compete for the shared OpenTSDB
   // instance and produce slow responses that look like failures.
   test.describe.configure({ mode: 'serial' });
 
-  test.describe('test.metrics.cpu', () => {
-    test('returns frames for the cpu metric', async ({ page }) => {
+  test.describe('cpu.usage', () => {
+    test('returns frames for the cpu metric', async ({ page, readProvisionedDataSource }) => {
+      const ds = await readProvisionedDataSource<OpenTsdbOptions>({ fileName: PROVISIONED_FILE });
       const responsePromise = waitForMainQueryResponse(page);
-      await page.goto(exploreUrl('test.metrics.cpu'));
+      await page.goto(exploreUrl(ds.uid, 'cpu.usage'));
       const { response, body } = await responsePromise;
       expect(response.ok()).toBe(true);
       expect(body.results?.A?.error).toBeUndefined();
@@ -169,21 +181,11 @@ test.describe('Query editor with fixture data', () => {
     });
   });
 
-  test.describe('test.metrics.memory', () => {
-    test('returns frames for the memory metric', async ({ page }) => {
+  test.describe('memory.usage_bytes', () => {
+    test('returns frames for the memory metric', async ({ page, readProvisionedDataSource }) => {
+      const ds = await readProvisionedDataSource<OpenTsdbOptions>({ fileName: PROVISIONED_FILE });
       const responsePromise = waitForMainQueryResponse(page);
-      await page.goto(exploreUrl('test.metrics.memory'));
-      const { response, body } = await responsePromise;
-      expect(response.ok()).toBe(true);
-      expect(body.results?.A?.error).toBeUndefined();
-      expect(body.results?.A?.frames?.length).toBeGreaterThan(0);
-    });
-  });
-
-  test.describe('test.metrics.requests', () => {
-    test('returns frames for the requests metric', async ({ page }) => {
-      const responsePromise = waitForMainQueryResponse(page);
-      await page.goto(exploreUrl('test.metrics.requests'));
+      await page.goto(exploreUrl(ds.uid, 'memory.usage_bytes'));
       const { response, body } = await responsePromise;
       expect(response.ok()).toBe(true);
       expect(body.results?.A?.error).toBeUndefined();
@@ -192,9 +194,10 @@ test.describe('Query editor with fixture data', () => {
   });
 
   test.describe('aggregator switch', () => {
-    test('avg aggregator returns frames', async ({ page }) => {
+    test('avg aggregator returns frames', async ({ page, readProvisionedDataSource }) => {
+      const ds = await readProvisionedDataSource<OpenTsdbOptions>({ fileName: PROVISIONED_FILE });
       const responsePromise = waitForMainQueryResponse(page);
-      await page.goto(exploreUrl('test.metrics.cpu', { aggregator: 'avg' }));
+      await page.goto(exploreUrl(ds.uid, 'cpu.usage', { aggregator: 'avg' }));
       const { response, body } = await responsePromise;
       expect(response.ok()).toBe(true);
       expect(body.results?.A?.error).toBeUndefined();
