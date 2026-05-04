@@ -3,14 +3,67 @@ services:
     image: petergrace/opentsdb-docker:latest@sha256:05d396f19800260c9bcfc918dbab97c289cf5f94cd90abed03adb357244516f0
     ports:
       - '4242:4242'
-  fake-opentsdb-data:
-    image: grafana/fake-data-gen@sha256:467a6d8f7701e11ecedc774e728eb3369e4a295f923159a9889f5d7b7d8cefec
+
+  # Loads a known set of metrics for the "Query editor with fixture data" tests.
+  # Metric names match the cloud-hosted OpenTSDB instance (cpu.usage,
+  # memory.usage_bytes) so the same tests pass against both local and Cloud.
+  # Keep these names in sync with tests/e2e/queryEditor.spec.ts.
+  #
+  # The loader does its own readiness polling against /api/version rather than
+  # relying on a Docker healthcheck on the opentsdb service. The petergrace
+  # image has no curl/wget on PATH that reliably hits /api/version while HBase
+  # is still booting, so a healthcheck-based dependency is too brittle.
+  opentsdb-loader:
+    image: curlimages/curl:8.10.1
     depends_on:
       - opentsdb
-    network_mode: 'service:opentsdb'
-    environment:
-      FD_DATASOURCE: opentsdb
-      FD_PORT: 4242
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        # Wait for the OpenTSDB HTTP API to come up. HBase boot is fast on x86_64
+        # native (~30s) but takes several minutes under qemu/ARM emulation, so we
+        # poll for up to ~10 minutes.
+        echo "Waiting for OpenTSDB to be ready..."
+        attempts=0
+        until curl --silent --fail "http://opentsdb:4242/api/version" > /dev/null 2>&1; do
+          attempts=$$((attempts + 1))
+          if [ $$attempts -gt 120 ]; then
+            echo "OpenTSDB never became ready" >&2
+            exit 1
+          fi
+          sleep 5
+        done
+        echo "OpenTSDB is ready, loading fixture data..."
+
+        # OpenTSDB only retains data within its retention window, so we generate
+        # fixture points relative to "now". Each test run posts 60 points spaced
+        # 60s apart (1 hour total) for two metrics.
+        now=$$(date +%s)
+        i=0
+        while [ $$i -lt 60 ]; do
+          ts=$$((now - (59 - i) * 60))
+          # awk handles floating point math (busybox shell can't).
+          cpu=$$(awk -v s=$$i 'BEGIN{printf "%.2f", 20 + 60 * (sin(s/12)^2)}')
+          mem=$$(awk -v s=$$i 'BEGIN{printf "%d", int((50 + 30 * (cos(s/8)^2)) * 1024 * 1024)}')
+          body='[
+            {"metric":"cpu.usage","timestamp":'$$ts',"value":'$$cpu',"tags":{"host":"web01","region":"eu-west-1"}},
+            {"metric":"memory.usage_bytes","timestamp":'$$ts',"value":'$$mem',"tags":{"host":"web01","region":"eu-west-1"}}
+          ]'
+          # Retry transiently — `auto_create_metrics` may still be initialising
+          # the UID tables on the first few writes.
+          curl --silent --show-error --fail --retry 10 --retry-all-errors --retry-delay 2 \
+            -H "Content-Type: application/json" \
+            -X POST -d "$$body" \
+            "http://opentsdb:4242/api/put?details" > /dev/null
+          i=$$((i + 1))
+        done
+        # OpenTSDB writes are asynchronous; give it a moment to flush.
+        sleep 2
+        echo "Fixture data loaded."
+    restart: no
+
   grafana:
     extends:
       file: .config/docker-compose-base.yaml
@@ -20,3 +73,6 @@ services:
       GF_FEATURE_TOGGLES_splashScreen: 'false'
     volumes:
       - ./custom.ini:/etc/grafana/grafana.ini
+    depends_on:
+      opentsdb-loader:
+        condition: service_completed_successfully
