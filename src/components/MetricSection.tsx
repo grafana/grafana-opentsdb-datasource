@@ -1,10 +1,10 @@
 import debounce from 'debounce-promise';
 import React from 'react';
 
-import { SelectableValue, toOption } from '@grafana/data';
+import { type SelectableValue, toOption } from '@grafana/data';
 import { Select, Input, InlineFormLabel, AsyncSelect, Stack, InlineLabel } from '@grafana/ui';
 
-import { OpenTsdbQuery } from '../types';
+import { type OpenTsdbQuery } from '../types';
 
 export interface MetricSectionProps {
   query: OpenTsdbQuery;

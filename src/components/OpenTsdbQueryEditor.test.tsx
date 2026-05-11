@@ -1,10 +1,10 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 
-import OpenTsDatasource from '../datasource';
-import { OpenTsdbQuery } from '../types';
+import type OpenTsDatasource from '../datasource';
+import { type OpenTsdbQuery } from '../types';
 
-import { OpenTsdbQueryEditor, OpenTsdbQueryEditorProps, testIds } from './OpenTsdbQueryEditor';
+import { OpenTsdbQueryEditor, type OpenTsdbQueryEditorProps, testIds } from './OpenTsdbQueryEditor';
 
 const setup = (propOverrides?: Object) => {
   const getAggregators = jest.fn().mockResolvedValue([]);

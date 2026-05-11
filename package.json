@@ -1,5 +1,6 @@
 {
   "name": "grafana-opentsdb-datasource",
+  "description": "OpenTSDB plugin for Grafana",
   "version": "13.0.0",
   "scripts": {
     "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
@@ -59,7 +60,7 @@
     "swc-loader": "0.2.7",
     "terser-webpack-plugin": "5.4.0",
     "ts-node": "10.9.2",
-    "typescript": "5.9.3",
+    "typescript": "^6.0.3",
     "webpack": "5.105.4",
     "webpack-cli": "7.0.2",
     "webpack-livereload-plugin": "3.0.2",
@@ -68,10 +69,10 @@
   },
   "dependencies": {
     "@emotion/css": "11.13.5",
-    "@grafana/data": "12.4.2",
-    "@grafana/runtime": "12.4.2",
-    "@grafana/schema": "12.4.2",
-    "@grafana/ui": "12.4.2",
+    "@grafana/data": "13.0.1",
+    "@grafana/runtime": "13.0.1",
+    "@grafana/schema": "13.0.1",
+    "@grafana/ui": "13.0.1",
     "debounce-promise": "3.1.2",
     "lodash": "4.17.23",
     "react": "18.3.1",

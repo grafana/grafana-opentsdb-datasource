@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import { OpenTsdbQuery } from '../types';
+import { type OpenTsdbQuery } from '../types';
 
-import { TagSection, TagSectionProps, testIds } from './TagSection';
+import { TagSection, type TagSectionProps, testIds } from './TagSection';
 
 const onRunQuery = jest.fn();
 const onChange = jest.fn();
