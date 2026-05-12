@@ -34,8 +34,9 @@ test.describe('Config editor', () => {
         await expect(getDataSourceHttpUrlInput(page)).toBeVisible();
         // Grafana >=13.1 replaced the #basic-settings-name input with an inline
         // editable heading. Match both shapes so the test works across versions.
+        // .first() avoids a strict-mode violation on builds that render both.
         await expect(
-          page.locator('#basic-settings-name').or(page.getByRole('button', { name: 'Edit title' }))
+          page.locator('#basic-settings-name').or(page.getByRole('button', { name: 'Edit title' })).first()
         ).toBeVisible();
       }
     );
