@@ -32,7 +32,11 @@ test.describe('Config editor', () => {
 
         await expect(page.getByRole('heading', { name: 'HTTP', exact: true })).toBeVisible({ timeout: 30_000 });
         await expect(getDataSourceHttpUrlInput(page)).toBeVisible();
-        await expect(page.locator('#basic-settings-name')).toBeVisible();
+        // Grafana >=13.1 replaced the #basic-settings-name input with an inline
+        // editable heading. Match both shapes so the test works across versions.
+        await expect(
+          page.locator('#basic-settings-name').or(page.getByRole('button', { name: 'Edit title' }))
+        ).toBeVisible();
       }
     );
 
