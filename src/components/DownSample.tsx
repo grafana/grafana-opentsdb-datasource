@@ -2,7 +2,7 @@ import React from 'react';
 import { toOption } from '@grafana/data';
 import { InlineLabel, Select, Input, InlineFormLabel, InlineSwitch, Stack } from '@grafana/ui';
 
-import { OpenTsdbQuery } from '../types';
+import { type OpenTsdbQuery } from '../types';
 
 export interface DownSampleProps {
   query: OpenTsdbQuery;

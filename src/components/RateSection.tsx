@@ -1,7 +1,7 @@
 import React from 'react';
 import { InlineLabel, Input, InlineFormLabel, InlineSwitch, Stack } from '@grafana/ui';
 
-import { OpenTsdbQuery } from '../types';
+import { type OpenTsdbQuery } from '../types';
 
 export interface RateSectionProps {
   query: OpenTsdbQuery;

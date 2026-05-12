@@ -1,10 +1,10 @@
 import { lastValueFrom, of } from 'rxjs';
 
-import { DataQueryRequest, dateTime } from '@grafana/data';
-import { DataSourceWithBackend, FetchResponse, TemplateSrv } from '@grafana/runtime';
+import { type DataQueryRequest, dateTime } from '@grafana/data';
+import { DataSourceWithBackend, type FetchResponse, type TemplateSrv } from '@grafana/runtime';
 
 import OpenTsDatasource from '../datasource';
-import { OpenTsdbQuery } from '../types';
+import { type OpenTsdbQuery } from '../types';
 
 export function createFetchResponse<T>(data: T): FetchResponse<T> {
   return {
