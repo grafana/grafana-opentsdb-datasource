@@ -18,7 +18,7 @@
   "author": "Grafana Labs <team@grafana.com> (https://grafana.com)",
   "license": "AGPL-3.0",
   "devDependencies": {
-    "@grafana/eslint-config": "9.0.0",
+    "@grafana/eslint-config": "10.0.0",
     "@grafana/plugin-e2e": "3.9.1",
     "@grafana/sign-plugin": "3.2.2",
     "@grafana/tsconfig": "2.2.0",
