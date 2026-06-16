@@ -1,0 +1,379 @@
+import { lastValueFrom, of } from 'rxjs';
+
+import { type DataQueryRequest, dateTime } from '@grafana/data';
+import { DataSourceWithBackend, type FetchResponse, type TemplateSrv } from '@grafana/runtime';
+
+import OpenTsDatasource from '../datasource';
+import { type OpenTsdbQuery } from '../types';
+
+export function createFetchResponse<T>(data: T): FetchResponse<T> {
+  return {
+    data,
+    status: 200,
+    url: 'http://localhost:3000/api/ds/query',
+    config: { url: 'http://localhost:3000/api/ds/query' },
+    type: 'basic',
+    statusText: 'Ok',
+    redirected: false,
+    headers: new Headers(),
+    ok: true,
+  };
+}
+
+const mockBackendSrv = {
+  fetch: jest.fn(),
+};
+
+// DataSourceWithBackend.getResource() calls getBackendSrv from an internal path Jest cannot mock
+// (blocked by package "exports"). Mirror the real URL/params behavior here so fetch assertions work.
+jest.mock('@grafana/runtime', () => ({
+  ...jest.requireActual('@grafana/runtime'),
+  getBackendSrv: () => mockBackendSrv,
+}));
+
+beforeAll(() => {
+  jest.spyOn(DataSourceWithBackend.prototype as any, 'getResource').mockImplementation(async function (
+    this: { uid?: string },
+    ...args: unknown[]
+  ) {
+    const path = args[0] as string;
+    const params = (args[1] as Record<string, unknown> | undefined) ?? {};
+    const res = await lastValueFrom(
+      mockBackendSrv.fetch({
+        method: 'GET',
+        url: `/api/datasources/uid/${this.uid ?? ''}/resources/${path}`,
+        params,
+      } as any)
+    );
+    return (res as FetchResponse<unknown>).data;
+  });
+});
+
+afterAll(() => {
+  jest.restoreAllMocks();
+});
+
+const TEST_DS_UID = 'test-ds-uid';
+
+function resourcesPath(resourcePath: string): string {
+  return `/api/datasources/uid/${TEST_DS_UID}/resources/${resourcePath}`;
+}
+
+const metricFindQueryData = [
+  {
+    target: 'prod1.count',
+    datapoints: [
+      [10, 1],
+      [12, 1],
+    ],
+  },
+];
+
+describe('opentsdb', () => {
+  function getTestcontext({ data = metricFindQueryData }: { data?: unknown } = {}) {
+    jest.clearAllMocks();
+    const fetchMock = jest.spyOn(mockBackendSrv, 'fetch');
+    fetchMock.mockImplementation(() => of(createFetchResponse(data)));
+
+    const instanceSettings = { url: '', uid: TEST_DS_UID, jsonData: { tsdbVersion: 1 } };
+    const replace = jest.fn((value) => value);
+    const templateSrv = {
+      replace,
+    } as unknown as TemplateSrv;
+
+    const ds = new OpenTsDatasource(instanceSettings, templateSrv);
+
+    return { ds, templateSrv, fetchMock };
+  }
+
+  describe('When performing metricFindQuery', () => {
+    it('metrics() should generate api suggest query', async () => {
+      const { ds, fetchMock } = getTestcontext();
+
+      const results = await ds.metricFindQuery('metrics(pew)');
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0].url).toBe(resourcesPath('api/suggest'));
+      expect(fetchMock.mock.calls[0][0].params?.type).toBe('metrics');
+      expect(fetchMock.mock.calls[0][0].params?.q).toBe('pew');
+      expect(results).not.toBe(null);
+    });
+
+    it('tag_names(cpu) should generate lookup query', async () => {
+      const { ds, fetchMock } = getTestcontext();
+
+      const results = await ds.metricFindQuery('tag_names(cpu)');
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0].url).toBe(resourcesPath('api/search/lookup'));
+      expect(fetchMock.mock.calls[0][0].params?.type).toBe('key');
+      expect(fetchMock.mock.calls[0][0].params?.metric).toBe('cpu');
+      expect(results).not.toBe(null);
+    });
+
+    it('tag_values(cpu, test) should generate lookup query', async () => {
+      const { ds, fetchMock } = getTestcontext();
+
+      const results = await ds.metricFindQuery('tag_values(cpu, hostname)');
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0].url).toBe(resourcesPath('api/search/lookup'));
+      expect(fetchMock.mock.calls[0][0].params?.type).toBe('keyvalue');
+      expect(fetchMock.mock.calls[0][0].params?.metric).toBe('cpu');
+      expect(fetchMock.mock.calls[0][0].params?.keys).toBe('hostname');
+      expect(results).not.toBe(null);
+    });
+
+    it('tag_values(cpu, test) should generate lookup query', async () => {
+      const { ds, fetchMock } = getTestcontext();
+
+      const results = await ds.metricFindQuery('tag_values(cpu, hostname, env=$env)');
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0].url).toBe(resourcesPath('api/search/lookup'));
+      expect(fetchMock.mock.calls[0][0].params?.type).toBe('keyvalue');
+      expect(fetchMock.mock.calls[0][0].params?.metric).toBe('cpu');
+      expect(fetchMock.mock.calls[0][0].params?.keys).toBe('hostname, env=$env');
+      expect(results).not.toBe(null);
+    });
+
+    it('tag_values(cpu, test) should generate lookup query', async () => {
+      const { ds, fetchMock } = getTestcontext();
+
+      const results = await ds.metricFindQuery('tag_values(cpu, hostname, env=$env, region=$region)');
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0].url).toBe(resourcesPath('api/search/lookup'));
+      expect(fetchMock.mock.calls[0][0].params?.type).toBe('keyvalue');
+      expect(fetchMock.mock.calls[0][0].params?.metric).toBe('cpu');
+      expect(fetchMock.mock.calls[0][0].params?.keys).toBe('hostname, env=$env, region=$region');
+      expect(results).not.toBe(null);
+    });
+
+    it('suggest_tagk() should generate api suggest query', async () => {
+      const { ds, fetchMock } = getTestcontext();
+
+      const results = await ds.metricFindQuery('suggest_tagk(foo)');
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0].url).toBe(resourcesPath('api/suggest'));
+      expect(fetchMock.mock.calls[0][0].params?.type).toBe('tagk');
+      expect(fetchMock.mock.calls[0][0].params?.q).toBe('foo');
+      expect(results).not.toBe(null);
+    });
+
+    it('suggest_tagv() should generate api suggest query', async () => {
+      const { ds, fetchMock } = getTestcontext();
+
+      const results = await ds.metricFindQuery('suggest_tagv(bar)');
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0].url).toBe(resourcesPath('api/suggest'));
+      expect(fetchMock.mock.calls[0][0].params?.type).toBe('tagv');
+      expect(fetchMock.mock.calls[0][0].params?.q).toBe('bar');
+      expect(results).not.toBe(null);
+    });
+  });
+
+  describe('When interpolating variables', () => {
+    it('should return an empty array if no queries are provided', () => {
+      const { ds } = getTestcontext();
+      expect(ds.interpolateVariablesInQueries([], {})).toHaveLength(0);
+    });
+
+    it('should replace metric and filter variable', () => {
+      const { ds, templateSrv } = getTestcontext();
+      const logQuery: OpenTsdbQuery = {
+        refId: 'someRefId',
+        metric: '$someVar',
+        filters: [
+          {
+            type: 'type',
+            tagk: '$someTagk',
+            filter: '$someTagv',
+            groupBy: true,
+          },
+        ],
+      };
+
+      ds.interpolateVariablesInQueries([logQuery], {});
+
+      expect(templateSrv.replace).toHaveBeenCalledWith('$someVar', {}, 'pipe');
+      expect(templateSrv.replace).toHaveBeenCalledWith('$someTagk', {}, 'pipe');
+      expect(templateSrv.replace).toHaveBeenCalledWith('$someTagv', {}, 'pipe');
+      expect(templateSrv.replace).toHaveBeenCalledTimes(3);
+    });
+
+    it('should replace filter tag key and value', () => {
+      const { ds, templateSrv } = getTestcontext();
+      let logQuery: OpenTsdbQuery = {
+        refId: 'A',
+        datasource: {
+          type: 'opentsdb',
+          uid: 'P311D5F9D9B165031',
+        },
+        aggregator: 'sum',
+        downsampleAggregator: 'avg',
+        downsampleFillPolicy: 'none',
+        metric: 'logins.count',
+        filters: [
+          {
+            type: 'iliteral_or',
+            tagk: '$someTagk',
+            filter: '$someTagv',
+            groupBy: false,
+          },
+        ],
+      };
+
+      const scopedVars = {
+        __interval: {
+          text: '20s',
+          value: '20s',
+        },
+        __interval_ms: {
+          text: '20000',
+          value: 20000,
+        },
+      };
+
+      const dataQR: DataQueryRequest<OpenTsdbQuery> = {
+        app: 'dashboard',
+        requestId: 'Q103',
+        timezone: 'browser',
+        panelId: 2,
+        dashboardUID: 'tyzmfPIVz',
+        range: {
+          from: dateTime('2022-10-19T08:55:18.430Z'),
+          to: dateTime('2022-10-19T14:55:18.431Z'),
+          raw: {
+            from: 'now-6h',
+            to: 'now',
+          },
+        },
+        timeInfo: '',
+        interval: '20s',
+        intervalMs: 20000,
+        targets: [logQuery],
+        maxDataPoints: 909,
+        scopedVars: scopedVars,
+        startTime: 1666191318431,
+        rangeRaw: {
+          from: 'now-6h',
+          to: 'now',
+        },
+      };
+
+      ds.interpolateVariablesInFilters(logQuery, dataQR.scopedVars);
+
+      expect(templateSrv.replace).toHaveBeenCalledWith('$someTagk', scopedVars, 'pipe');
+      expect(templateSrv.replace).toHaveBeenCalledWith('$someTagv', scopedVars, 'pipe');
+
+      expect(templateSrv.replace).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('When applying template variables', () => {
+    it('should interpolate filter values so no raw template variables are sent', () => {
+      const { ds, templateSrv } = getTestcontext();
+
+      templateSrv.replace = jest.fn((value: unknown, scopedVars?: Record<string, { value: unknown }>) => {
+        if (value === '${host}') {
+          return String(scopedVars?.host?.value);
+        }
+        return value as string;
+      });
+
+      const query: OpenTsdbQuery = {
+        refId: 'A',
+        metric: 'cpu.utilisation',
+        aggregator: 'avg',
+        filters: [
+          {
+            type: 'regexp',
+            tagk: 'host',
+            filter: '${host}',
+            groupBy: true,
+          },
+        ],
+      };
+
+      const scopedVars = { host: { text: 'ABC', value: 'ABC' } };
+      const interpolated = ds.applyTemplateVariables(query, scopedVars);
+
+      expect(interpolated.filters?.[0].filter).toBe('ABC');
+      expect(JSON.stringify(interpolated)).not.toContain('${host}');
+    });
+
+    it('should interpolate tags when filters are not used', () => {
+      const { ds, templateSrv } = getTestcontext();
+
+      templateSrv.replace = jest.fn((value: unknown, scopedVars?: Record<string, { value: unknown }>) => {
+        if (value === '${host}') {
+          return String(scopedVars?.host?.value);
+        }
+        return value as string;
+      });
+
+      const query: OpenTsdbQuery = {
+        refId: 'A',
+        metric: 'cpu.utilisation',
+        tags: {
+          host: '${host}',
+        },
+      };
+
+      const scopedVars = { host: { text: 'ABC', value: 'ABC' } };
+      const interpolated = ds.applyTemplateVariables(query, scopedVars);
+
+      expect(interpolated.tags?.host).toBe('ABC');
+      expect(JSON.stringify(interpolated)).not.toContain('${host}');
+    });
+
+    it('should interpolate additional query fields', () => {
+      const { ds, templateSrv } = getTestcontext();
+
+      templateSrv.replace = jest.fn((value: unknown, scopedVars?: Record<string, { value: unknown }>) => {
+        if (typeof value !== 'string') {
+          return value as string;
+        }
+
+        return value.replace(/\$\{([^}]+)\}/g, (_, key: string) => String(scopedVars?.[key]?.value ?? ''));
+      });
+
+      const query: OpenTsdbQuery = {
+        refId: 'A',
+        metric: '${metric}',
+        alias: '${alias}',
+        downsampleInterval: '${interval}',
+        downsampleAggregator: '${downsampleAggregator}',
+        downsampleFillPolicy: '${downsampleFillPolicy}',
+        counterMax: '${counterMax}',
+        counterResetValue: '${counterResetValue}',
+      };
+
+      const scopedVars = {
+        metric: { text: 'cpu.usage', value: 'cpu.usage' },
+        aggregator: { text: 'sum', value: 'sum' },
+        alias: { text: 'CPU usage', value: 'CPU usage' },
+        interval: { text: '1m', value: '1m' },
+        downsampleAggregator: { text: 'avg', value: 'avg' },
+        downsampleFillPolicy: { text: 'zero', value: 'zero' },
+        counterMax: { text: '100', value: '100' },
+        counterResetValue: { text: '50', value: '50' },
+      };
+
+      const interpolated = ds.applyTemplateVariables(query, scopedVars);
+
+      expect(interpolated.metric).toBe('cpu.usage');
+      expect(interpolated.aggregator).toBe('avg');
+      expect(interpolated.alias).toBe('CPU usage');
+      expect(interpolated.downsampleInterval).toBe('1m');
+      expect(interpolated.downsampleAggregator).toBe('avg');
+      expect(interpolated.downsampleFillPolicy).toBe('zero');
+      expect(interpolated.counterMax).toBe('100');
+      expect(interpolated.counterResetValue).toBe('50');
+      expect(JSON.stringify(interpolated)).not.toContain('${');
+    });
+  });
+});
