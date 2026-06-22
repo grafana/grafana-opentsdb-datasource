@@ -1,5 +1,5 @@
 {
-  "name": "grafana-opentsdb-datasource",
+  "name": "opentsdb",
   "description": "OpenTSDB plugin for Grafana",
   "version": "13.0.1",
   "packageManager": "npm@11.12.1",
