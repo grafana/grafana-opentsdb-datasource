@@ -2,7 +2,7 @@
   "name": "opentsdb",
   "description": "OpenTSDB plugin for Grafana",
   "version": "13.0.1",
-  "packageManager": "npm@11.12.1",
+  "packageManager": "npm@12.0.1",
   "scripts": {
     "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
     "dev": "webpack -w -c ./.config/webpack/webpack.config.ts --env development",
