@@ -2,10 +2,7 @@
 import { expect, test } from '@grafana/plugin-e2e';
 import { type Locator, type Page, type Response } from '@playwright/test';
 
-import { OpenTsdbOptions } from '../../src/types';
-
-const DS_NAME = process.env.DS_INSTANCE_NAME || 'opentsdb';
-const PROVISIONED_FILE = 'datasources.yml';
+import { DS_NAME, resolveDataSourceUid } from './env';
 
 // OpenTSDB only retains data within its retention window, so the loader writes
 // fixture points relative to "now" (1 hour worth at 60 s spacing). Compute the
@@ -19,13 +16,11 @@ const DYNAMIC_FROM_ISO = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
 // shapes so tests work across versions until @grafana/plugin-e2e ships a fix
 // and this repo upgrades.
 function getQueryEditorRow(page: Page, refId: string): Locator {
-  return page
-    .locator('[data-testid="data-testid Query editor row"], [aria-label="Query editor row"]')
-    .filter({
-      has: page.locator(
-        `[data-testid="data-testid Query editor row title ${refId}"], [aria-label="Query editor row title ${refId}"]`
-      ),
-    });
+  return page.locator('[data-testid="data-testid Query editor row"], [aria-label="Query editor row"]').filter({
+    has: page.locator(
+      `[data-testid="data-testid Query editor row title ${refId}"], [aria-label="Query editor row title ${refId}"]`
+    ),
+  });
 }
 
 // Builds an Explore URL with an OpenTSDB metric query pre-encoded in the panes
@@ -80,22 +75,18 @@ test.describe('Query editor', () => {
   });
 
   test.describe('rendering', () => {
-    test(
-      'smoke: renders metric and aggregator selects',
-      { tag: '@plugins' },
-      async ({ explorePage, page }) => {
-        // Suggest endpoints fire on mount via the OpenTSDB resource API. Mock
-        // them so the smoke test does not depend on a healthy backend.
-        await explorePage.mockResourceResponse('suggest?type=metrics&max=1000', []);
-        await explorePage.mockResourceResponse('aggregators', []);
-        await explorePage.mockResourceResponse('config/filters', []);
+    test('smoke: renders metric and aggregator selects', { tag: '@plugins' }, async ({ explorePage, page }) => {
+      // Suggest endpoints fire on mount via the OpenTSDB resource API. Mock
+      // them so the smoke test does not depend on a healthy backend.
+      await explorePage.mockResourceResponse('suggest?type=metrics&max=1000', []);
+      await explorePage.mockResourceResponse('aggregators', []);
+      await explorePage.mockResourceResponse('config/filters', []);
 
-        await expect(page.getByTestId('opentsdb-editor')).toBeVisible({ timeout: 30_000 });
-        await expect(page.getByTestId('opentsdb-metricsection')).toBeVisible();
-        await expect(page.locator('#opentsdb-metric-select')).toBeVisible();
-        await expect(page.locator('#opentsdb-aggregator-select')).toBeVisible();
-      }
-    );
+      await expect(page.getByTestId('opentsdb-editor')).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByTestId('opentsdb-metricsection')).toBeVisible();
+      await expect(page.locator('#opentsdb-metric-select')).toBeVisible();
+      await expect(page.locator('#opentsdb-aggregator-select')).toBeVisible();
+    });
 
     test('renders all query sections', async ({ explorePage, page }) => {
       await explorePage.mockResourceResponse('suggest?type=metrics&max=1000', []);
@@ -137,12 +128,8 @@ test.describe('Query editor', () => {
   });
 
   test.describe('query execution', () => {
-    test('executes a metric query and receives OK response', async ({
-      explorePage,
-      page,
-      readProvisionedDataSource,
-    }) => {
-      const ds = await readProvisionedDataSource<OpenTsdbOptions>({ fileName: PROVISIONED_FILE });
+    test('executes a metric query and receives OK response', async ({ explorePage, page }) => {
+      const dsUid = await resolveDataSourceUid(page);
 
       await explorePage.mockQueryDataResponse({ results: { A: { frames: [] } } });
       await explorePage.mockResourceResponse('suggest?type=metrics&max=1000', []);
@@ -150,7 +137,7 @@ test.describe('Query editor', () => {
       await explorePage.mockResourceResponse('config/filters', []);
 
       const responsePromise = page.waitForResponse((resp) => resp.url().includes('/api/ds/query'));
-      await page.goto(exploreUrl(ds.uid, 'cpu.usage'));
+      await page.goto(exploreUrl(dsUid, 'cpu.usage'));
 
       const response = await responsePromise;
       expect(response.ok()).toBe(true);
@@ -170,10 +157,10 @@ test.describe('Query editor with fixture data', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.describe('cpu.usage', () => {
-    test('returns frames for the cpu metric', async ({ page, readProvisionedDataSource }) => {
-      const ds = await readProvisionedDataSource<OpenTsdbOptions>({ fileName: PROVISIONED_FILE });
+    test('returns frames for the cpu metric', async ({ page }) => {
+      const dsUid = await resolveDataSourceUid(page);
       const responsePromise = waitForMainQueryResponse(page);
-      await page.goto(exploreUrl(ds.uid, 'cpu.usage'));
+      await page.goto(exploreUrl(dsUid, 'cpu.usage'));
       const { response, body } = await responsePromise;
       expect(response.ok()).toBe(true);
       expect(body.results?.A?.error).toBeUndefined();
@@ -182,10 +169,10 @@ test.describe('Query editor with fixture data', () => {
   });
 
   test.describe('memory.usage_bytes', () => {
-    test('returns frames for the memory metric', async ({ page, readProvisionedDataSource }) => {
-      const ds = await readProvisionedDataSource<OpenTsdbOptions>({ fileName: PROVISIONED_FILE });
+    test('returns frames for the memory metric', async ({ page }) => {
+      const dsUid = await resolveDataSourceUid(page);
       const responsePromise = waitForMainQueryResponse(page);
-      await page.goto(exploreUrl(ds.uid, 'memory.usage_bytes'));
+      await page.goto(exploreUrl(dsUid, 'memory.usage_bytes'));
       const { response, body } = await responsePromise;
       expect(response.ok()).toBe(true);
       expect(body.results?.A?.error).toBeUndefined();
@@ -194,10 +181,10 @@ test.describe('Query editor with fixture data', () => {
   });
 
   test.describe('aggregator switch', () => {
-    test('avg aggregator returns frames', async ({ page, readProvisionedDataSource }) => {
-      const ds = await readProvisionedDataSource<OpenTsdbOptions>({ fileName: PROVISIONED_FILE });
+    test('avg aggregator returns frames', async ({ page }) => {
+      const dsUid = await resolveDataSourceUid(page);
       const responsePromise = waitForMainQueryResponse(page);
-      await page.goto(exploreUrl(ds.uid, 'cpu.usage', { aggregator: 'avg' }));
+      await page.goto(exploreUrl(dsUid, 'cpu.usage', { aggregator: 'avg' }));
       const { response, body } = await responsePromise;
       expect(response.ok()).toBe(true);
       expect(body.results?.A?.error).toBeUndefined();
