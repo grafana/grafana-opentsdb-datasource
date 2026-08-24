@@ -28,13 +28,17 @@ function getQueryEditorRow(page: Page, refId: string): Locator {
 // loaded fixture window.
 function exploreUrl(dsUid: string, metric: string, extra: Record<string, unknown> = {}): string {
   const panes = JSON.stringify({
-    a1b: {
+    explore: {
       datasource: dsUid,
       queries: [
         {
           refId: 'A',
           metric,
           aggregator: 'sum',
+          // Match OpenTsdbQueryEditor's effective defaults so its mount effect
+          // does not rewrite the URL query before Explore auto-runs it.
+          downsampleAggregator: 'avg',
+          downsampleFillPolicy: 'none',
           datasource: { type: 'opentsdb', uid: dsUid },
           ...extra,
         },
@@ -138,8 +142,6 @@ test.describe('Query editor', () => {
 
       const responsePromise = page.waitForResponse((resp) => resp.url().includes('/api/ds/query'));
       await page.goto(exploreUrl(dsUid, 'cpu.usage'));
-      await expect(page.getByTestId('opentsdb-editor')).toBeVisible();
-      await explorePage.runQuery();
 
       const response = await responsePromise;
       expect(response.ok()).toBe(true);
@@ -159,12 +161,10 @@ test.describe('Query editor with fixture data', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.describe('cpu.usage', () => {
-    test('returns frames for the cpu metric', async ({ explorePage, page }) => {
+    test('returns frames for the cpu metric', async ({ page }) => {
       const dsUid = await resolveDataSourceUid(page);
       const responsePromise = waitForMainQueryResponse(page);
       await page.goto(exploreUrl(dsUid, 'cpu.usage'));
-      await expect(page.getByTestId('opentsdb-editor')).toBeVisible();
-      await explorePage.runQuery();
       const { response, body } = await responsePromise;
       expect(response.ok()).toBe(true);
       expect(body.results?.A?.error).toBeUndefined();
@@ -173,12 +173,10 @@ test.describe('Query editor with fixture data', () => {
   });
 
   test.describe('memory.usage_bytes', () => {
-    test('returns frames for the memory metric', async ({ explorePage, page }) => {
+    test('returns frames for the memory metric', async ({ page }) => {
       const dsUid = await resolveDataSourceUid(page);
       const responsePromise = waitForMainQueryResponse(page);
       await page.goto(exploreUrl(dsUid, 'memory.usage_bytes'));
-      await expect(page.getByTestId('opentsdb-editor')).toBeVisible();
-      await explorePage.runQuery();
       const { response, body } = await responsePromise;
       expect(response.ok()).toBe(true);
       expect(body.results?.A?.error).toBeUndefined();
@@ -187,12 +185,10 @@ test.describe('Query editor with fixture data', () => {
   });
 
   test.describe('aggregator switch', () => {
-    test('avg aggregator returns frames', async ({ explorePage, page }) => {
+    test('avg aggregator returns frames', async ({ page }) => {
       const dsUid = await resolveDataSourceUid(page);
       const responsePromise = waitForMainQueryResponse(page);
       await page.goto(exploreUrl(dsUid, 'cpu.usage', { aggregator: 'avg' }));
-      await expect(page.getByTestId('opentsdb-editor')).toBeVisible();
-      await explorePage.runQuery();
       const { response, body } = await responsePromise;
       expect(response.ok()).toBe(true);
       expect(body.results?.A?.error).toBeUndefined();
