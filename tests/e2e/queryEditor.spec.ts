@@ -49,14 +49,22 @@ function exploreUrl(dsUid: string, metric: string, extra: Record<string, unknown
   return `/explore?orgId=1&schemaVersion=1&panes=${encodeURIComponent(panes)}`;
 }
 
-// Waits for the first /api/ds/query response where results.A has frames.
+function isQueryRequestUrl(rawUrl: string): boolean {
+  const { pathname } = new URL(rawUrl);
+  return (
+    pathname === '/api/ds/query' ||
+    /^\/apis\/query\.grafana\.app\/v0alpha1\/namespaces\/[^/]+\/query$/.test(pathname)
+  );
+}
+
+// Waits for the first data source query response where results.A has frames.
 // response.json() must be called inside the predicate while the CDP body
 // reference is still valid; calling it after the await fails intermittently
 // with "No resource with given identifier found".
 async function waitForMainQueryResponse(page: Page): Promise<{ response: Response; body: any }> {
   let body: any;
   const response = await page.waitForResponse(async (r: Response) => {
-    if (!r.url().includes('/api/ds/query') || !r.ok()) {
+    if (!isQueryRequestUrl(r.url()) || !r.ok()) {
       return false;
     }
     const b = await r.json().catch(() => null);
@@ -135,12 +143,17 @@ test.describe('Query editor', () => {
     test('executes a metric query and receives OK response', async ({ explorePage, page }) => {
       const dsUid = await resolveDataSourceUid(page);
 
-      await explorePage.mockQueryDataResponse({ results: { A: { frames: [] } } });
+      await page.route(
+        (url) => isQueryRequestUrl(url.toString()),
+        async (route) => {
+          await route.fulfill({ json: { results: { A: { frames: [] } } }, status: 200 });
+        }
+      );
       await explorePage.mockResourceResponse('suggest?type=metrics&max=1000', []);
       await explorePage.mockResourceResponse('aggregators', []);
       await explorePage.mockResourceResponse('config/filters', []);
 
-      const responsePromise = page.waitForResponse((resp) => resp.url().includes('/api/ds/query'));
+      const responsePromise = page.waitForResponse((resp) => isQueryRequestUrl(resp.url()));
       await page.goto(exploreUrl(dsUid, 'cpu.usage'));
 
       const response = await responsePromise;
