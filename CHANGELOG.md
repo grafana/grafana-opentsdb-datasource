@@ -1,5 +1,10 @@
 # Changelog
 
+## 13.0.3
+
+- Update frontend dependencies ([#53](https://github.com/grafana/grafana-opentsdb-datasource/pull/53))
+- Update backend dependencies ([#80](https://github.com/grafana/grafana-opentsdb-datasource/pull/80))
+
 ## 13.0.2
 
 - Bump go v1.26.7 and grafana-plugin-sdk-go v0.296.4 ([#73](https://github.com/grafana/grafana-opentsdb-datasource/pull/73))
