@@ -2,7 +2,7 @@
   "name": "opentsdb",
   "description": "OpenTSDB plugin for Grafana",
   "version": "13.0.2",
-  "packageManager": "npm@11.19.1",
+  "packageManager": "npm@11.19.0",
   "scripts": {
     "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
     "dev": "webpack -w -c ./.config/webpack/webpack.config.ts --env development",
@@ -69,9 +69,9 @@
   },
   "dependencies": {
     "@emotion/css": "11.13.5",
-    "@grafana/data": "13.2.1",
-    "@grafana/runtime": "13.2.1",
-    "@grafana/ui": "13.2.1",
+    "@grafana/data": "13.1.5",
+    "@grafana/runtime": "13.1.5",
+    "@grafana/ui": "13.1.5",
     "debounce-promise": "3.1.2",
     "lodash": "4.18.1",
     "react": "18.3.1",
