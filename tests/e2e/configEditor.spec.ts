@@ -2,14 +2,10 @@ import { expect, test } from '@grafana/plugin-e2e';
 import { type Locator, type Page } from '@playwright/test';
 
 import { OpenTsdbOptions } from '../../src/types';
+import { DS_URL, isCloudRun, resolveDataSourceUid } from './env';
 
 const PLUGIN_TYPE = 'opentsdb';
 const PROVISIONED_FILE = 'datasources.yml';
-
-// In CI/Cloud the data source URL is provisioned from Vault and exposed via
-// DS_INSTANCE_URL. Locally docker-compose names the backend `opentsdb` and the
-// provisioned datasources.yml uses http://opentsdb:4242.
-const DS_URL = process.env.DS_INSTANCE_URL || 'http://opentsdb:4242';
 
 // The DataSourceHttpSettings URL input migrated from aria-label to data-testid
 // in Grafana 13 (https://github.com/grafana/grafana/pull/121784). Match both
@@ -24,22 +20,21 @@ function getDataSourceHttpUrlInput(page: Page): Locator {
 
 test.describe('Config editor', () => {
   test.describe('rendering', () => {
-    test(
-      'smoke: should render config editor',
-      { tag: '@plugins' },
-      async ({ createDataSourceConfigPage, page }) => {
-        await createDataSourceConfigPage({ type: PLUGIN_TYPE });
+    test('smoke: should render config editor', { tag: '@plugins' }, async ({ createDataSourceConfigPage, page }) => {
+      await createDataSourceConfigPage({ type: PLUGIN_TYPE });
 
-        await expect(page.getByRole('heading', { name: 'HTTP', exact: true })).toBeVisible({ timeout: 30_000 });
-        await expect(getDataSourceHttpUrlInput(page)).toBeVisible();
-        // Grafana >=13.1 replaced the #basic-settings-name input with an inline
-        // editable heading. Match both shapes so the test works across versions.
-        // .first() avoids a strict-mode violation on builds that render both.
-        await expect(
-          page.locator('#basic-settings-name').or(page.getByRole('button', { name: 'Edit title' })).first()
-        ).toBeVisible();
-      }
-    );
+      await expect(page.getByRole('heading', { name: 'HTTP', exact: true })).toBeVisible({ timeout: 30_000 });
+      await expect(getDataSourceHttpUrlInput(page)).toBeVisible();
+      // Grafana >=13.1 replaced the #basic-settings-name input with an inline
+      // editable heading. Match both shapes so the test works across versions.
+      // .first() avoids a strict-mode violation on builds that render both.
+      await expect(
+        page
+          .locator('#basic-settings-name')
+          .or(page.getByRole('button', { name: 'Edit title' }))
+          .first()
+      ).toBeVisible();
+    });
 
     test('should render OpenTSDB settings section', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_TYPE });
@@ -56,6 +51,10 @@ test.describe('Config editor', () => {
   });
 
   test.describe('provisioned datasource', () => {
+    test.beforeEach(() => {
+      test.skip(isCloudRun, 'These assertions target the local provisioning file.');
+    });
+
     test('should load provisioned URL', async ({ readProvisionedDataSource, gotoDataSourceConfigPage, page }) => {
       const ds = await readProvisionedDataSource<OpenTsdbOptions>({ fileName: PROVISIONED_FILE });
       await gotoDataSourceConfigPage(ds.uid);
@@ -94,6 +93,8 @@ test.describe('Config editor', () => {
       gotoDataSourceConfigPage,
       page,
     }) => {
+      test.skip(isCloudRun, 'This assertion targets the local provisioning file.');
+
       const ds = await readProvisionedDataSource({ fileName: PROVISIONED_FILE });
       const configPage = await gotoDataSourceConfigPage(ds.uid);
 
@@ -117,11 +118,26 @@ test.describe('Config editor', () => {
     test('should show error alert when backend is unreachable', async ({ createDataSourceConfigPage, page }) => {
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
 
-      // Point at a port nothing is listening on (uses the Cloud host where present).
-      const url = DS_URL.replace(/:(\d+)$/, ':14242');
-      await getDataSourceHttpUrlInput(page).fill(url);
+      const unreachableUrl = new URL(DS_URL);
+      unreachableUrl.port = '14242';
+      await getDataSourceHttpUrlInput(page).fill(unreachableUrl.toString());
       await page.getByRole('button', { name: /^(Save & test|Test)$/ }).click();
       await expect(configPage).toHaveAlert('error');
+    });
+  });
+
+  test.describe('cloud datasource', () => {
+    test.beforeEach(() => {
+      test.skip(!isCloudRun, 'Targets the data source provisioned on the shared Cloud instance.');
+    });
+
+    test('should pass health check for the Cloud-provisioned datasource', async ({
+      gotoDataSourceConfigPage,
+      page,
+    }) => {
+      const configPage = await gotoDataSourceConfigPage(await resolveDataSourceUid(page));
+      await page.getByRole('button', { name: /^(Save & test|Test)$/ }).click();
+      await expect(configPage).toHaveAlert('success');
     });
   });
 });
