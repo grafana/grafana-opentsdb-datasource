@@ -3,6 +3,7 @@ package opentsdb
 import (
 	"context"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,6 +16,23 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// dnsErrorRoundTripper simulates a transport-level DNS failure, such as the
+// customer's resolver returning SERVFAIL ("server misbehaving") when looking
+// up their OpenTSDB host.
+type dnsErrorRoundTripper struct{}
+
+func (dnsErrorRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return nil, &net.OpError{
+		Op:  "dial",
+		Net: "tcp",
+		Err: &net.DNSError{
+			Err:         "server misbehaving",
+			Name:        req.URL.Hostname(),
+			IsTemporary: true,
+		},
+	}
+}
 
 func TestCheckHealth(t *testing.T) {
 	tests := []struct {
@@ -710,5 +728,28 @@ func TestOpenTsdbExecutor(t *testing.T) {
 		require.Contains(t, bodies[0], `"end":2000`)
 		require.Contains(t, bodies[1], `"start":3000`)
 		require.Contains(t, bodies[1], `"end":4000`)
+	})
+
+	t.Run("DNS failure reaching the customer's OpenTSDB server is classified as downstream", func(t *testing.T) {
+		ds := &DataSource{info: &datasourceInfo{
+			HTTPClient: &http.Client{Transport: dnsErrorRoundTripper{}},
+			URL:        "http://opentsdb.example.com",
+		}}
+
+		req := backend.QueryDataRequest{
+			Queries: []backend.DataQuery{
+				{
+					RefID: "A",
+					JSON:  []byte(`{"metric":"cpu.average.percent","aggregator":"avg"}`),
+				},
+			},
+		}
+
+		resp, err := ds.QueryData(context.Background(), &req)
+		require.NoError(t, err)
+
+		result := resp.Responses["A"]
+		require.Error(t, result.Error)
+		require.Equal(t, backend.ErrorSourceDownstream, result.ErrorSource)
 	})
 }
