@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -178,7 +179,8 @@ func (ds *DataSource) QueryData(ctx context.Context, req *backend.QueryDataReque
 
 		httpRes, err := dsInfo.HTTPClient.Do(httpReq)
 		if err != nil {
-			if backend.IsDownstreamHTTPError(err) {
+			var dnsErr *net.DNSError
+			if backend.IsDownstreamHTTPError(err) || errors.As(err, &dnsErr) {
 				err = backend.DownstreamError(err)
 			}
 			var urlErr *url.Error
