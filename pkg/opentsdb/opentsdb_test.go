@@ -2,7 +2,9 @@ package opentsdb
 
 import (
 	"context"
+	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,6 +17,49 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type errorTransport struct{ err error }
+
+func (t errorTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, t.err
+}
+
+func TestQueryDataDNSErrorSource(t *testing.T) {
+	tests := []struct {
+		name   string
+		err    error
+		source backend.ErrorSource
+	}{
+		{
+			name:   "DNS server failure",
+			err:    &net.DNSError{Err: "server misbehaving", IsTemporary: true},
+			source: backend.ErrorSourceDownstream,
+		},
+		{
+			name:   "other transport error remains unclassified",
+			err:    errors.New("plugin failure"),
+			source: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ds := &DataSource{info: &datasourceInfo{
+				HTTPClient: &http.Client{Transport: errorTransport{err: tt.err}},
+				URL:        "https://opentsdb.example.com",
+			}}
+			response, err := ds.QueryData(context.Background(), &backend.QueryDataRequest{
+				Queries: []backend.DataQuery{{
+					RefID: "A",
+					JSON:  []byte(`{"metric":"cpu","aggregator":"avg"}`),
+				}},
+			})
+			require.NoError(t, err)
+			require.Equal(t, tt.source, response.Responses["A"].ErrorSource)
+			require.Error(t, response.Responses["A"].Error)
+		})
+	}
+}
 
 func TestCheckHealth(t *testing.T) {
 	tests := []struct {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 13.0.4
+
+- Classify DNS resolution failures from OpenTSDB queries as downstream errors.
+
 ## 13.0.3
 
 - Update frontend dependencies ([#53](https://github.com/grafana/grafana-opentsdb-datasource/pull/53))
