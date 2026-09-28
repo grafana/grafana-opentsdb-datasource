@@ -2,6 +2,7 @@ package opentsdb
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -31,6 +32,40 @@ func (dnsErrorRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 			Name:        req.URL.Hostname(),
 			IsTemporary: true,
 		},
+	}
+}
+
+type errorTransport struct{ err error }
+
+func (t errorTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, t.err
+}
+
+func TestQueryDataOtherTransportErrorsRemainUnclassified(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "other DNS failure", err: &net.DNSError{Err: "server unavailable"}},
+		{name: "other transport error", err: errors.New("plugin failure")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ds := &DataSource{info: &datasourceInfo{
+				HTTPClient: &http.Client{Transport: errorTransport{err: tt.err}},
+				URL:        "https://opentsdb.example.com",
+			}}
+			response, err := ds.QueryData(context.Background(), &backend.QueryDataRequest{
+				Queries: []backend.DataQuery{{
+					RefID: "A",
+					JSON:  []byte(`{"metric":"cpu","aggregator":"avg"}`),
+				}},
+			})
+			require.NoError(t, err)
+			require.Error(t, response.Responses["A"].Error)
+			require.Empty(t, response.Responses["A"].ErrorSource)
+		})
 	}
 }
 
