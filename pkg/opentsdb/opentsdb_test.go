@@ -2,7 +2,9 @@ package opentsdb
 
 import (
 	"context"
+	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,6 +17,57 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// dnsErrorRoundTripper simulates a transport-level DNS failure, such as the
+// customer's resolver returning SERVFAIL ("server misbehaving") when looking
+// up their OpenTSDB host.
+type dnsErrorRoundTripper struct{}
+
+func (dnsErrorRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return nil, &net.OpError{
+		Op:  "dial",
+		Net: "tcp",
+		Err: &net.DNSError{
+			Err:         "server misbehaving",
+			Name:        req.URL.Hostname(),
+			IsTemporary: true,
+		},
+	}
+}
+
+type errorTransport struct{ err error }
+
+func (t errorTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, t.err
+}
+
+func TestQueryDataOtherTransportErrorsRemainUnclassified(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "other DNS failure", err: &net.DNSError{Err: "server unavailable"}},
+		{name: "other transport error", err: errors.New("plugin failure")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ds := &DataSource{info: &datasourceInfo{
+				HTTPClient: &http.Client{Transport: errorTransport{err: tt.err}},
+				URL:        "https://opentsdb.example.com",
+			}}
+			response, err := ds.QueryData(context.Background(), &backend.QueryDataRequest{
+				Queries: []backend.DataQuery{{
+					RefID: "A",
+					JSON:  []byte(`{"metric":"cpu","aggregator":"avg"}`),
+				}},
+			})
+			require.NoError(t, err)
+			require.Error(t, response.Responses["A"].Error)
+			require.Empty(t, response.Responses["A"].ErrorSource)
+		})
+	}
+}
 
 func TestCheckHealth(t *testing.T) {
 	tests := []struct {
@@ -710,5 +763,28 @@ func TestOpenTsdbExecutor(t *testing.T) {
 		require.Contains(t, bodies[0], `"end":2000`)
 		require.Contains(t, bodies[1], `"start":3000`)
 		require.Contains(t, bodies[1], `"end":4000`)
+	})
+
+	t.Run("DNS failure reaching the customer's OpenTSDB server is classified as downstream", func(t *testing.T) {
+		ds := &DataSource{info: &datasourceInfo{
+			HTTPClient: &http.Client{Transport: dnsErrorRoundTripper{}},
+			URL:        "http://opentsdb.example.com",
+		}}
+
+		req := backend.QueryDataRequest{
+			Queries: []backend.DataQuery{
+				{
+					RefID: "A",
+					JSON:  []byte(`{"metric":"cpu.average.percent","aggregator":"avg"}`),
+				},
+			},
+		}
+
+		resp, err := ds.QueryData(context.Background(), &req)
+		require.NoError(t, err)
+
+		result := resp.Responses["A"]
+		require.Error(t, result.Error)
+		require.Equal(t, backend.ErrorSourceDownstream, result.ErrorSource)
 	})
 }
