@@ -1,5 +1,9 @@
 # Changelog
 
+## 13.0.5
+
+- Fix CVEs in transitive dependencies: update brace-expansion and override basic-ftp to v6.
+
 ## 13.0.4
 
 - Classify OpenTSDB query DNS "server misbehaving" failures as downstream errors.
