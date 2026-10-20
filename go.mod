@@ -1,6 +1,6 @@
 module github.com/grafana/grafana-opentsdb-datasource
 
-go 1.26.6
+go 1.27.3
 
 require (
 	github.com/google/go-cmp v0.7.0
