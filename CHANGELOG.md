@@ -1,5 +1,9 @@
 # Changelog
 
+## 13.0.6
+
+- Update Go to 1.27.3 ([#91](https://github.com/grafana/grafana-opentsdb-datasource/pull/91))
+
 ## 13.0.5
 
 - Fix CVEs in transitive dependencies: update brace-expansion and override basic-ftp to v6.
