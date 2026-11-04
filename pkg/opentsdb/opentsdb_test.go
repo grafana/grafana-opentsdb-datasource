@@ -788,3 +788,18 @@ func TestOpenTsdbExecutor(t *testing.T) {
 		require.Equal(t, backend.ErrorSourceDownstream, result.ErrorSource)
 	})
 }
+
+func TestQueryDataAppliesAlias(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`[{"metric": "cpu", "tags": {"code": "200"}, "dps": {"1405544146": 50.0}}]`))
+	}))
+	defer server.Close()
+
+	ds := &DataSource{info: &datasourceInfo{HTTPClient: server.Client(), URL: server.URL}}
+	result, err := ds.QueryData(context.Background(), &backend.QueryDataRequest{
+		Queries: []backend.DataQuery{{RefID: "A", JSON: []byte(`{"metric":"cpu","aggregator":"sum","alias":"code $tag_code ${tag_code} [[tag_code]] $tag_nope"}`)}},
+	})
+	require.NoError(t, err)
+	require.NoError(t, result.Responses["A"].Error)
+	assert.Equal(t, "code 200 200 200 $tag_nope", result.Responses["A"].Frames[0].Fields[1].Config.DisplayNameFromDS)
+}
