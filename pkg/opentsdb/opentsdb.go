@@ -83,6 +83,7 @@ type QueryModel struct {
 	CounterMax           string                 `json:"counterMax"`
 	CounterResetValue    string                 `json:"counterResetValue"`
 	ExplicitTags         bool                   `json:"explicitTags"`
+	Alias                string                 `json:"alias"`
 }
 
 func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult, error) {
@@ -208,6 +209,10 @@ func (ds *DataSource) QueryData(ctx context.Context, req *backend.QueryDataReque
 			result.Responses[query.RefID] = backend.ErrorResponseWithErrorSource(backend.DownstreamError(err))
 			continue
 		}
+
+		var model QueryModel
+		_ = json.Unmarshal(query.JSON, &model)
+		ApplyAlias(queryRes.Responses[query.RefID].Frames, model.Alias)
 
 		result.Responses[query.RefID] = queryRes.Responses[query.RefID]
 	}
