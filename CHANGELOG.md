@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 13.0.8
 
+- Fix CVEs in transitive dependencies: update dompurify to 3.4.17, source-map-js to 1.2.2 and zod to 4.6.7
 - Fix a connection freeze between Grafana and the plugin under heavy query load by updating google.golang.org/grpc to v1.85.0 ([grpc/grpc-go#9330](https://github.com/grpc/grpc-go/issues/9330))
 
 ## 13.0.7
