@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -183,6 +184,13 @@ func (ds *DataSource) QueryData(ctx context.Context, req *backend.QueryDataReque
 			}
 			var urlErr *url.Error
 			if errors.As(err, &urlErr) && urlErr.Err != nil && strings.HasPrefix(urlErr.Err.Error(), "unsupported protocol scheme") {
+				err = backend.DownstreamError(err)
+			}
+			// backend.IsDownstreamHTTPError only treats DNS "not found" errors as downstream.
+			// A SERVFAIL response ("server misbehaving") is the customer's resolver/network
+			// problem, not a plugin bug, so classify that specific DNS failure as downstream too.
+			var dnsErr *net.DNSError
+			if errors.As(err, &dnsErr) && dnsErr.Err == "server misbehaving" {
 				err = backend.DownstreamError(err)
 			}
 			result.Responses[query.RefID] = backend.ErrorResponseWithErrorSource(err)
