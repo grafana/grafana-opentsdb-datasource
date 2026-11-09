@@ -14,7 +14,7 @@ services:
   # image has no curl/wget on PATH that reliably hits /api/version while HBase
   # is still booting, so a healthcheck-based dependency is too brittle.
   opentsdb-loader:
-    image: curlimages/curl:8.10.1
+    image: curlimages/curl:8.23.0@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93
     depends_on:
       - opentsdb
     entrypoint:
