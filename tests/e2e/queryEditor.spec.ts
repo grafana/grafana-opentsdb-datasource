@@ -51,10 +51,7 @@ function exploreUrl(dsUid: string, metric: string, extra: Record<string, unknown
 
 function isQueryRequestUrl(rawUrl: string): boolean {
   const { pathname } = new URL(rawUrl);
-  return (
-    pathname === '/api/ds/query' ||
-    /^\/apis\/query\.grafana\.app\/v0alpha1\/namespaces\/[^/]+\/query$/.test(pathname)
-  );
+  return pathname === '/api/ds/query' || /^\/apis\/[^/]+\/[^/]+\/namespaces\/[^/]+\/query$/.test(pathname);
 }
 
 // Waits for the first data source query response where results.A has frames.
