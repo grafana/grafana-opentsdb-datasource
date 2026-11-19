@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -220,6 +221,25 @@ func CreateDataFrame(val OpenTsdbCommon, length int, refID string) *data.Frame {
 	dataField.Labels = labels
 
 	return frame
+}
+
+var aliasTagPattern = regexp.MustCompile(`\$tag_\w+|\$\{tag_\w+\}|\[\[tag_\w+\]\]`)
+
+func ApplyAlias(frames data.Frames, alias string) {
+	if alias == "" {
+		return
+	}
+	for _, frame := range frames {
+		field := frame.Fields[1]
+		name := aliasTagPattern.ReplaceAllStringFunc(alias, func(match string) string {
+			tag := strings.TrimPrefix(strings.Trim(match, "${}[]"), "tag_")
+			if value, ok := field.Labels[tag]; ok {
+				return value
+			}
+			return match
+		})
+		field.Config = &data.FieldConfig{DisplayNameFromDS: name}
+	}
 }
 
 func ParseResponse(logger log.Logger, res *http.Response, refID string, tsdbVersion float32) (*backend.QueryDataResponse, error) {
