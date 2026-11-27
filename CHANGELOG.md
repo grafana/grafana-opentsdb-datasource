@@ -1,5 +1,10 @@
 # Changelog
 
+## 13.0.9
+
+- Fix security vulnerabilities in golang.org/x/net, moment, ip-address, fast-uri, basic-ftp and glob
+- Update backend and frontend dependencies
+
 ## 13.0.8
 
 - Fix CVEs in transitive dependencies: update dompurify to 3.4.17, source-map-js to 1.2.2 and zod to 4.6.7
