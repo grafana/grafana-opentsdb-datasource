@@ -1,0 +1,247 @@
+{
+  "examples": {
+    "": {
+      "summary": "OpenTSDB 2.3 without authentication",
+      "value": {
+        "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "opentsdb"
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "lookupLimit": 1000,
+            "tsdbResolution": 1,
+            "tsdbVersion": 3
+          },
+          "title": "OpenTSDB",
+          "url": "http://localhost:4242"
+        }
+      }
+    },
+    "basicAuth": {
+      "summary": "Basic authentication",
+      "value": {
+        "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "opentsdb"
+        },
+        "secure": {
+          "basicAuthPassword": {
+            "create": "\u003cPASSWORD\u003e"
+          }
+        },
+        "spec": {
+          "access": "proxy",
+          "basicAuth": true,
+          "basicAuthUser": "\u003cUSERNAME\u003e",
+          "jsonData": {
+            "lookupLimit": 1000,
+            "tsdbResolution": 1,
+            "tsdbVersion": 3
+          },
+          "title": "OpenTSDB",
+          "url": "http://localhost:4242"
+        }
+      }
+    },
+    "clientTLS": {
+      "summary": "Authenticate with a TLS client certificate",
+      "value": {
+        "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "opentsdb"
+        },
+        "secure": {
+          "tlsClientCert": {
+            "create": "\u003cCLIENT_CERTIFICATE_PEM\u003e"
+          },
+          "tlsClientKey": {
+            "create": "\u003cCLIENT_KEY_PEM\u003e"
+          }
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "lookupLimit": 1000,
+            "tlsAuth": true,
+            "tsdbResolution": 1,
+            "tsdbVersion": 3
+          },
+          "title": "OpenTSDB",
+          "url": "https://localhost:4242"
+        }
+      }
+    },
+    "cookies": {
+      "summary": "Pass selected cookies to the plugin only",
+      "value": {
+        "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "opentsdb"
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "keepCookies": [
+              "example_session"
+            ],
+            "lookupLimit": 1000,
+            "tsdbResolution": 1,
+            "tsdbVersion": 3
+          },
+          "title": "OpenTSDB",
+          "url": "https://localhost:4242",
+          "withCredentials": true
+        }
+      }
+    },
+    "customCA": {
+      "summary": "Verify the server with a private CA",
+      "value": {
+        "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "opentsdb"
+        },
+        "secure": {
+          "tlsCACert": {
+            "create": "\u003cCA_CERTIFICATE_PEM\u003e"
+          }
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "lookupLimit": 1000,
+            "tlsAuthWithCACert": true,
+            "tsdbResolution": 1,
+            "tsdbVersion": 3
+          },
+          "title": "OpenTSDB",
+          "url": "https://localhost:4242"
+        }
+      }
+    },
+    "customHeader": {
+      "summary": "Authenticate using a custom HTTP header",
+      "value": {
+        "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "opentsdb"
+        },
+        "secure": {
+          "httpHeaderValue1": {
+            "create": "\u003cHEADER_VALUE\u003e"
+          }
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "httpHeaderName1": "X-Custom-Header",
+            "lookupLimit": 1000,
+            "tsdbResolution": 1,
+            "tsdbVersion": 3
+          },
+          "title": "OpenTSDB",
+          "url": "http://localhost:4242"
+        }
+      }
+    },
+    "forwardOAuth": {
+      "summary": "Pass the user's OAuth token to the plugin only",
+      "value": {
+        "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "opentsdb"
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "lookupLimit": 1000,
+            "oauthPassThru": true,
+            "tsdbResolution": 1,
+            "tsdbVersion": 3
+          },
+          "title": "OpenTSDB",
+          "url": "https://localhost:4242"
+        }
+      }
+    },
+    "privateNetwork": {
+      "summary": "Connect through a Grafana Cloud PDC private network",
+      "value": {
+        "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "opentsdb"
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "enableSecureSocksProxy": true,
+            "lookupLimit": 1000,
+            "secureSocksProxyUsername": "\u003cPDC_NETWORK_ID\u003e",
+            "tsdbResolution": 1,
+            "tsdbVersion": 3
+          },
+          "title": "OpenTSDB",
+          "url": "http://opentsdb:4242"
+        }
+      }
+    },
+    "secureSocksProxy": {
+      "summary": "Connect through a self-managed secure SOCKS proxy",
+      "value": {
+        "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "opentsdb"
+        },
+        "secure": {
+          "secureSocksProxyPassword": {
+            "create": "\u003cPROXY_PASSWORD\u003e"
+          }
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "enableSecureSocksProxy": true,
+            "lookupLimit": 1000,
+            "secureSocksProxyUsername": "\u003cPROXY_USERNAME\u003e",
+            "tsdbResolution": 1,
+            "tsdbVersion": 3
+          },
+          "title": "OpenTSDB",
+          "url": "http://localhost:4242"
+        }
+      }
+    },
+    "skipTLSVerify": {
+      "summary": "Connect to a test server without checking its TLS certificate",
+      "value": {
+        "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "opentsdb"
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "lookupLimit": 1000,
+            "tlsSkipVerify": true,
+            "tsdbResolution": 1,
+            "tsdbVersion": 3
+          },
+          "title": "OpenTSDB",
+          "url": "https://localhost:4242"
+        }
+      }
+    }
+  }
+}

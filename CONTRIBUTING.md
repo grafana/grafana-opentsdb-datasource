@@ -54,6 +54,22 @@ This project adheres to the [Grafana Code of Conduct](https://github.com/grafana
    mage -v
    ```
 
+## Data source configuration schema
+
+Edit `pkg/schema/dsconfig.json` when the editor, backend or provisioning settings change. Keep the schema URL pinned to the `github.com/grafana/dsconfig/dsconfig` version in `go.mod`. Follow the [dsconfig format](https://github.com/grafana/dsconfig/blob/main/dsconfig/schema.md) for field types, storage and conditions.
+
+The conformance test in `pkg/schema/dsconfig_test.go` embeds the backend loader's `opentsdb.JSONData` from `pkg/opentsdb/opentsdb.go`. Update that model for plugin settings. Update the test's `settings` struct for fields read by Grafana or the SDK, its `SecureKeys` for static secrets, and its examples when a connection mode changes.
+
+Run these commands from the repository root:
+
+```shell
+go generate ./pkg/schema
+go test ./pkg/schema
+npm run build
+```
+
+Generation writes `pkg/schema/schema.gen.json`, `pkg/schema/settings.gen.json`, and `pkg/schema/settings.examples.gen.json`. Webpack packages these files and the handwritten schema in `dist/schema/`.
+
 ## Local development environment
 
 `npm run server` starts a local OpenTSDB instance and a Grafana instance with the plugin pre-provisioned:
