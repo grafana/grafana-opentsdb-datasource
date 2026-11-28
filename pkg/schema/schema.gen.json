@@ -1,0 +1,424 @@
+{
+  "targetApiVersion": "v0alpha1",
+  "settings": {
+    "spec": {
+      "type": "object",
+      "required": [
+        "url"
+      ],
+      "properties": {
+        "access": {
+          "description": "Grafana provisioning defaults to proxy access. The editor has no access selector and plugin queries run on the backend.",
+          "type": "string",
+          "default": "proxy",
+          "enum": [
+            "proxy",
+            "direct"
+          ],
+          "x-dsconfig-depends-on": "false"
+        },
+        "basicAuth": {
+          "description": "Enable this only when the OpenTSDB endpoint requires HTTP Basic authentication. It defaults to false. TLS settings and custom HTTP headers work independently of Basic auth.",
+          "type": "boolean",
+          "default": false
+        },
+        "basicAuthUser": {
+          "description": "Username to send when HTTP Basic authentication is enabled. Omit it for connections without Basic auth.",
+          "type": "string",
+          "x-dsconfig-depends-on": "plugin_sdk_settings.basicAuth == true",
+          "x-dsconfig-required-when": "plugin_sdk_settings.basicAuth == true"
+        },
+        "jsonData": {
+          "type": "object",
+          "properties": {
+            "enableSecureSocksProxy": {
+              "description": "Route requests through the secure SOCKS proxy configured on the Grafana instance. In Grafana Cloud, set secureSocksProxyUsername to the selected PDC private network ID.",
+              "type": "boolean",
+              "default": false
+            },
+            "httpHeaders": {
+              "description": "Extra HTTP headers sent to OpenTSDB. Provision each name as jsonData.httpHeaderName1, httpHeaderName2, and so on. Store each matching value in secureJsonData.httpHeaderValue1, httpHeaderValue2, and so on.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[!#$%\u0026'*+.^_`|~0-9A-Za-z-]+$"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                }
+              },
+              "x-dsconfig-depends-on": "plugin_sdk_settings.access != 'direct'"
+            },
+            "keepAlive": {
+              "description": "TCP keep-alive interval in whole seconds for the SOCKS proxy connection. Zero uses the Go dialer default. A negative value disables keep-alive probes.",
+              "type": "number",
+              "default": 30,
+              "x-dsconfig-depends-on": "false"
+            },
+            "keepCookies": {
+              "description": "Cookie names Grafana passes to the plugin. The OpenTSDB backend HTTP client does not forward those cookies to the server.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "x-dsconfig-depends-on": "plugin_sdk_settings.access == 'proxy'"
+            },
+            "lookupLimit": {
+              "description": "Maximum results for suggestions and tag-value lookups, as a nonnegative whole number. Zero or an omitted limit sends 1000 for suggestions and 0 for tag-value lookups. Set 1000 explicitly to use it for both. Tag-key lookups always request 1000.",
+              "type": "number",
+              "default": 1000,
+              "maximum": 2147483647,
+              "minimum": 0
+            },
+            "oauthPassThru": {
+              "description": "Pass the signed-in user's OAuth identity from Grafana to the plugin. The OpenTSDB backend HTTP client does not forward it to the server.",
+              "type": "boolean",
+              "default": false,
+              "x-dsconfig-depends-on": "plugin_sdk_settings.access != 'direct'"
+            },
+            "secureSocksProxyUsername": {
+              "description": "In Grafana Cloud, supply the selected PDC private network ID. For a self-managed SOCKS proxy, supply its username or omit it to use the data source UID.",
+              "type": "string",
+              "x-dsconfig-depends-on": "false"
+            },
+            "serverName": {
+              "description": "Optional hostname used for TLS certificate verification and SNI. The editor shows it with TLS Client Auth. Provisioning also accepts it with a custom CA alone.",
+              "type": "string",
+              "x-dsconfig-depends-on": "plugin_sdk_settings.tlsAuth == true"
+            },
+            "timeout": {
+              "description": "HTTP request timeout in whole seconds. Zero removes the request timeout.",
+              "type": "number",
+              "default": 30,
+              "minimum": 0,
+              "x-dsconfig-depends-on": "plugin_sdk_settings.access != 'direct'"
+            },
+            "tlsAuth": {
+              "description": "Validate using TLS client authentication, in which the server authenticates the client",
+              "type": "boolean",
+              "default": false,
+              "x-dsconfig-depends-on": "plugin_sdk_settings.access != 'direct'"
+            },
+            "tlsAuthWithCACert": {
+              "description": "Verify the server certificate with a custom certificate authority.",
+              "type": "boolean",
+              "default": false,
+              "x-dsconfig-depends-on": "plugin_sdk_settings.access == 'proxy'"
+            },
+            "tlsSkipVerify": {
+              "description": "Skip verification of the OpenTSDB server certificate and hostname.",
+              "type": "boolean",
+              "default": false,
+              "x-dsconfig-depends-on": "plugin_sdk_settings.access != 'direct'"
+            },
+            "tsdbResolution": {
+              "description": "The editor stores 1 for seconds or 2 for milliseconds. This setting has no effect on current queries, which request and read timestamps in seconds.",
+              "type": "number",
+              "default": 1,
+              "enum": [
+                1,
+                2
+              ]
+            },
+            "tsdbVersion": {
+              "description": "Select the OpenTSDB release to set query editor features and the response format. Use 1 for 2.1 or earlier, 2 for 2.2, 3 for 2.3, or 4 for 2.4.",
+              "type": "number",
+              "default": 1,
+              "enum": [
+                1,
+                2,
+                3,
+                4
+              ]
+            }
+          }
+        },
+        "url": {
+          "description": "Base HTTP or HTTPS URL of the OpenTSDB server, including its port. The plugin appends the API path.",
+          "type": "string"
+        },
+        "withCredentials": {
+          "description": "Sets the credentials flag on legacy browser HTTP requests. Backend queries use the plugin HTTP client.",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "secureValues": [
+      {
+        "key": "basicAuthPassword",
+        "description": "Password to send when HTTP Basic authentication is enabled. Omit it for connections without Basic auth."
+      },
+      {
+        "key": "tlsCACert",
+        "description": "PEM-encoded CA certificate used to verify the server."
+      },
+      {
+        "key": "tlsClientCert",
+        "description": "PEM-encoded client certificate used for mTLS. Forwarded to the SDK as `TLSOptions.ClientCertificate`."
+      },
+      {
+        "key": "tlsClientKey",
+        "description": "PEM-encoded private key paired with `tlsClientCert`. Forwarded to the SDK as `TLSOptions.ClientKey`."
+      },
+      {
+        "key": "secureSocksProxyPassword",
+        "description": "Password for a self-managed SOCKS proxy if it requires one."
+      }
+    ]
+  },
+  "settingsExamples": {
+    "examples": {
+      "": {
+        "summary": "OpenTSDB 2.3 without authentication",
+        "value": {
+          "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+          "kind": "DataSource",
+          "metadata": {
+            "name": "opentsdb"
+          },
+          "spec": {
+            "access": "proxy",
+            "jsonData": {
+              "lookupLimit": 1000,
+              "tsdbResolution": 1,
+              "tsdbVersion": 3
+            },
+            "title": "OpenTSDB",
+            "url": "http://localhost:4242"
+          }
+        }
+      },
+      "basicAuth": {
+        "summary": "Basic authentication",
+        "value": {
+          "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+          "kind": "DataSource",
+          "metadata": {
+            "name": "opentsdb"
+          },
+          "secure": {
+            "basicAuthPassword": {
+              "create": "\u003cPASSWORD\u003e"
+            }
+          },
+          "spec": {
+            "access": "proxy",
+            "basicAuth": true,
+            "basicAuthUser": "\u003cUSERNAME\u003e",
+            "jsonData": {
+              "lookupLimit": 1000,
+              "tsdbResolution": 1,
+              "tsdbVersion": 3
+            },
+            "title": "OpenTSDB",
+            "url": "http://localhost:4242"
+          }
+        }
+      },
+      "clientTLS": {
+        "summary": "Authenticate with a TLS client certificate",
+        "value": {
+          "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+          "kind": "DataSource",
+          "metadata": {
+            "name": "opentsdb"
+          },
+          "secure": {
+            "tlsClientCert": {
+              "create": "\u003cCLIENT_CERTIFICATE_PEM\u003e"
+            },
+            "tlsClientKey": {
+              "create": "\u003cCLIENT_KEY_PEM\u003e"
+            }
+          },
+          "spec": {
+            "access": "proxy",
+            "jsonData": {
+              "lookupLimit": 1000,
+              "tlsAuth": true,
+              "tsdbResolution": 1,
+              "tsdbVersion": 3
+            },
+            "title": "OpenTSDB",
+            "url": "https://localhost:4242"
+          }
+        }
+      },
+      "cookies": {
+        "summary": "Pass selected cookies to the plugin only",
+        "value": {
+          "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+          "kind": "DataSource",
+          "metadata": {
+            "name": "opentsdb"
+          },
+          "spec": {
+            "access": "proxy",
+            "jsonData": {
+              "keepCookies": [
+                "example_session"
+              ],
+              "lookupLimit": 1000,
+              "tsdbResolution": 1,
+              "tsdbVersion": 3
+            },
+            "title": "OpenTSDB",
+            "url": "https://localhost:4242",
+            "withCredentials": true
+          }
+        }
+      },
+      "customCA": {
+        "summary": "Verify the server with a private CA",
+        "value": {
+          "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+          "kind": "DataSource",
+          "metadata": {
+            "name": "opentsdb"
+          },
+          "secure": {
+            "tlsCACert": {
+              "create": "\u003cCA_CERTIFICATE_PEM\u003e"
+            }
+          },
+          "spec": {
+            "access": "proxy",
+            "jsonData": {
+              "lookupLimit": 1000,
+              "tlsAuthWithCACert": true,
+              "tsdbResolution": 1,
+              "tsdbVersion": 3
+            },
+            "title": "OpenTSDB",
+            "url": "https://localhost:4242"
+          }
+        }
+      },
+      "customHeader": {
+        "summary": "Authenticate using a custom HTTP header",
+        "value": {
+          "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+          "kind": "DataSource",
+          "metadata": {
+            "name": "opentsdb"
+          },
+          "secure": {
+            "httpHeaderValue1": {
+              "create": "\u003cHEADER_VALUE\u003e"
+            }
+          },
+          "spec": {
+            "access": "proxy",
+            "jsonData": {
+              "httpHeaderName1": "X-Custom-Header",
+              "lookupLimit": 1000,
+              "tsdbResolution": 1,
+              "tsdbVersion": 3
+            },
+            "title": "OpenTSDB",
+            "url": "http://localhost:4242"
+          }
+        }
+      },
+      "forwardOAuth": {
+        "summary": "Pass the user's OAuth token to the plugin only",
+        "value": {
+          "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+          "kind": "DataSource",
+          "metadata": {
+            "name": "opentsdb"
+          },
+          "spec": {
+            "access": "proxy",
+            "jsonData": {
+              "lookupLimit": 1000,
+              "oauthPassThru": true,
+              "tsdbResolution": 1,
+              "tsdbVersion": 3
+            },
+            "title": "OpenTSDB",
+            "url": "https://localhost:4242"
+          }
+        }
+      },
+      "privateNetwork": {
+        "summary": "Connect through a Grafana Cloud PDC private network",
+        "value": {
+          "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+          "kind": "DataSource",
+          "metadata": {
+            "name": "opentsdb"
+          },
+          "spec": {
+            "access": "proxy",
+            "jsonData": {
+              "enableSecureSocksProxy": true,
+              "lookupLimit": 1000,
+              "secureSocksProxyUsername": "\u003cPDC_NETWORK_ID\u003e",
+              "tsdbResolution": 1,
+              "tsdbVersion": 3
+            },
+            "title": "OpenTSDB",
+            "url": "http://opentsdb:4242"
+          }
+        }
+      },
+      "secureSocksProxy": {
+        "summary": "Connect through a self-managed secure SOCKS proxy",
+        "value": {
+          "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+          "kind": "DataSource",
+          "metadata": {
+            "name": "opentsdb"
+          },
+          "secure": {
+            "secureSocksProxyPassword": {
+              "create": "\u003cPROXY_PASSWORD\u003e"
+            }
+          },
+          "spec": {
+            "access": "proxy",
+            "jsonData": {
+              "enableSecureSocksProxy": true,
+              "lookupLimit": 1000,
+              "secureSocksProxyUsername": "\u003cPROXY_USERNAME\u003e",
+              "tsdbResolution": 1,
+              "tsdbVersion": 3
+            },
+            "title": "OpenTSDB",
+            "url": "http://localhost:4242"
+          }
+        }
+      },
+      "skipTLSVerify": {
+        "summary": "Connect to a test server without checking its TLS certificate",
+        "value": {
+          "apiVersion": "opentsdb.datasource.grafana.app/v0alpha1",
+          "kind": "DataSource",
+          "metadata": {
+            "name": "opentsdb"
+          },
+          "spec": {
+            "access": "proxy",
+            "jsonData": {
+              "lookupLimit": 1000,
+              "tlsSkipVerify": true,
+              "tsdbResolution": 1,
+              "tsdbVersion": 3
+            },
+            "title": "OpenTSDB",
+            "url": "https://localhost:4242"
+          }
+        }
+      }
+    }
+  }
+}
